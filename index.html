@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COACH AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0a; --surface: #111111; --surface2: #1a1a1a; --surface3: #222222;
+  --border: #2a2a2a; --accent: #c8f230; --accent2: #a8d420;
+  --text: #f0f0f0; --text2: #888; --text3: #555;
+  --red: #ff4444; --blue: #4488ff; --radius: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Heebo', sans-serif; }
+#app { display: flex; height: 100vh; }
+#sidebar { width: 220px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+#main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.logo { padding: 24px 20px 16px; }
+.logo-mark { font-size: 22px; font-weight: 900; color: var(--accent); letter-spacing: -1px; }
+.logo-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+nav { flex: 1; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; color: var(--text2); transition: all 0.15s; border: none; background: none; width: 100%; text-align: right; }
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--accent); color: #000; font-weight: 700; }
+.nav-item .icon { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-section { font-size: 10px; color: var(--text3); padding: 12px 12px 4px; text-transform: uppercase; letter-spacing: 1px; }
+.sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
+.user-card { display: flex; align-items: center; gap: 10px; }
+.user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #000; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; flex-shrink: 0; }
+.user-name { font-size: 13px; font-weight: 500; }
+.user-goal { font-size: 11px; color: var(--text3); }
+.page { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
+.page.active { display: flex; }
+.page-header { padding: 28px 32px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.page-title { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; }
+.page-sub { font-size: 14px; color: var(--text2); margin-top: 4px; }
+.page-content { padding: 24px 32px; flex: 1; }
+#chat-page { display: none; flex-direction: column; }
+#chat-page.active { display: flex; }
+#chat-messages { flex: 1; overflow-y: auto; padding: 24px 32px; display: flex; flex-direction: column; gap: 16px; }
+.msg { display: flex; gap: 12px; max-width: 78%; }
+.msg.user { align-self: flex-start; flex-direction: row-reverse; }
+.msg.agent { align-self: flex-end; }
+.msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+.msg.agent .msg-avatar { background: var(--accent); color: #000; }
+.msg.user .msg-avatar { background: var(--surface3); color: var(--text2); }
+.msg-bubble { padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.65; }
+.msg.agent .msg-bubble { background: var(--surface2); border: 1px solid var(--border); border-bottom-right-radius: 4px; }
+.msg.user .msg-bubble { background: var(--accent); color: #000; font-weight: 500; border-bottom-left-radius: 4px; }
+.msg-bubble strong { font-weight: 700; }
+.msg-bubble ul { padding-right: 20px; margin: 4px 0; }
+.msg-bubble li { margin: 3px 0; }
+#chat-input-area { padding: 16px 32px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.chat-input-row { display: flex; gap: 10px; align-items: flex-end; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
+#chat-text { flex: 1; background: none; border: none; outline: none; color: var(--text); font-size: 14px; font-family: 'Heebo', sans-serif; resize: none; max-height: 120px; line-height: 1.5; }
+#chat-text::placeholder { color: var(--text3); }
+.chat-actions { display: flex; gap: 8px; align-items: center; }
+.img-btn { width: 36px; height: 36px; border-radius: 8px; background: var(--surface3); border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text2); transition: all 0.15s; }
+.img-btn:hover { border-color: var(--accent); color: var(--accent); }
+.send-btn { width: 36px; height: 36px; border-radius: 8px; background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.send-btn:hover { background: var(--accent2); }
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+#file-input { display: none; }
+.typing-dots { display: flex; gap: 5px; padding: 4px 0; }
+.typing-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); animation: bounce 1.2s infinite; }
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+.img-preview { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.img-thumb { position: relative; width: 56px; height: 56px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.img-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.img-remove { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,0.7); border: none; cursor: pointer; color: white; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.stat-card.accent { border-color: var(--accent); background: rgba(200,242,48,0.05); }
+.stat-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 32px; font-weight: 900; margin: 6px 0 2px; letter-spacing: -1px; }
+.stat-unit { font-size: 13px; color: var(--text2); }
+.stat-change { font-size: 12px; margin-top: 8px; font-weight: 600; }
+.stat-change.good { color: var(--accent); }
+.stat-change.bad { color: var(--red); }
+.log-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+.log-form h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+.form-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.form-group { flex: 1; min-width: 120px; }
+.form-group label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 6px; }
+.form-group input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; font-family: 'Heebo', sans-serif; outline: none; }
+.form-group input:focus { border-color: var(--accent); }
+.btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-family: 'Heebo', sans-serif; font-weight: 700; cursor: pointer; border: none; transition: all 0.15s; }
+.btn-accent { background: var(--accent); color: #000; }
+.btn-accent:hover { background: var(--accent2); }
+.btn-ghost { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+.chart-title { font-size: 14px; font-weight: 700; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+.chart-area { position: relative; height: 140px; }
+canvas { width: 100% !important; }
+.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 20px; }
+.day-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; text-align: center; cursor: pointer; transition: all 0.15s; }
+.day-card:hover { border-color: var(--accent); }
+.day-card.active { border-color: var(--accent); background: rgba(200,242,48,0.08); }
+.day-card.rest { opacity: 0.5; }
+.day-card.today { box-shadow: 0 0 0 2px var(--accent); }
+.day-name { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+.day-type { font-size: 12px; font-weight: 700; }
+.day-type.workout { color: var(--accent); }
+.day-type.rest-type { color: var(--text3); }
+.exercise-list { display: flex; flex-direction: column; gap: 8px; }
+.exercise-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.ex-num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #000; font-weight: 900; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ex-info { flex: 1; }
+.ex-name { font-size: 14px; font-weight: 700; }
+.ex-detail { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.ex-badge { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: var(--surface3); color: var(--text2); }
+.plan-placeholder { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; color: var(--text2); }
+.plan-placeholder .ph-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
+.plan-placeholder p { font-size: 14px; margin-bottom: 16px; }
+.meal-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px; }
+.meal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.meal-name { font-size: 15px; font-weight: 700; }
+.meal-cals { font-size: 13px; color: var(--accent); font-weight: 700; }
+.food-list { display: flex; flex-direction: column; gap: 6px; }
+.food-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.food-row:last-child { border: none; }
+.food-name { color: var(--text); }
+.food-macros { color: var(--text2); font-size: 12px; }
+.photos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.photo-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+.photo-card:hover { border-color: var(--accent); }
+.photo-img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; }
+.photo-meta { padding: 8px 10px; }
+.photo-date { font-size: 12px; color: var(--text2); }
+.photo-weight { font-size: 13px; font-weight: 700; }
+.add-photo-card { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); aspect-ratio: 3/4; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; color: var(--text3); }
+.add-photo-card:hover { border-color: var(--accent); color: var(--accent); }
+.add-photo-card svg { margin-bottom: 8px; }
+.add-photo-card span { font-size: 13px; font-weight: 500; }
+#photo-input { display: none; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+@media (max-width: 640px) {
+  #sidebar { width: 64px; }
+  .logo-mark, .logo-sub, .nav-item span, .user-name, .user-goal, .nav-section { display: none; }
+  .nav-item { justify-content: center; padding: 12px; }
+  .page-content, #chat-messages, #chat-input-area { padding-left: 16px; padding-right: 16px; }
+  .page-header { padding: 20px 16px 16px; }
+  .week-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.section-title { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.divider { height: 1px; background: var(--border); margin: 20px 0; }
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text2); }
+.empty-state p { font-size: 14px; }
+/* Toast */
+@keyframes slideUp { from { transform: translate(-50%, 16px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+.toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; font-weight: 700; padding: 12px 24px; border-radius: 10px; font-size: 14px; z-index: 9999; animation: slideUp 0.25s ease; white-space: nowrap; pointer-events: none; }
+/* API Key overlay */
+.key-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(10px); }
+.key-dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 36px; width: 440px; max-width: 90vw; }
+.key-dialog h2 { font-size: 22px; font-weight: 900; margin-bottom: 8px; }
+.key-dialog p { font-size: 14px; color: var(--text2); margin-bottom: 24px; line-height: 1.65; }
+.key-dialog input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; color: var(--text); font-size: 14px; font-family: monospace; outline: none; margin-bottom: 14px; direction: ltr; }
+.key-dialog input:focus { border-color: var(--accent); }
+.key-note { font-size: 12px; color: var(--text3); margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<!-- API Key Overlay -->
+<div id="key-overlay" class="key-overlay" style="display:none">
+  <div class="key-dialog">
+    <h2>🔑 הגדרת מפתח API</h2>
+    <p>כדי להפעיל את COACH AI תצטרך מפתח API של Anthropic.<br>המפתח נשמר <strong>רק בדפדפן שלך</strong> ולא נשלח לשום שרת חיצוני.</p>
+    <input type="password" id="key-input" placeholder="sk-ant-api03-..." autocomplete="off" dir="ltr">
+    <button class="btn btn-accent" style="width:100%;padding:12px" onclick="saveApiKey()">שמור והתחל 💪</button>
+    <div class="key-note">🔒 המפתח מאוחסן ב-localStorage המקומי שלך בלבד</div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="logo">
+      <div class="logo-mark">COACH AI</div>
+      <div class="logo-sub">מאמן כושר אישי</div>
+    </div>
+    <nav>
+      <div class="nav-section">ראשי</div>
+      <button class="nav-item active" data-page="chat" onclick="navigateTo('chat')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>צ'אט עם המאמן</span>
+      </button>
+      <button class="nav-item" data-page="training" onclick="navigateTo('training')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16"/></svg>
+        <span>תוכנית אימונים</span>
+      </button>
+      <button class="nav-item" data-page="nutrition" onclick="navigateTo('nutrition')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a9 9 0 0 1 9 9c0 5-4 9-9 9S3 16 3 11a9 9 0 0 1 9-9z"/><path d="M12 6v6l4 2"/></svg>
+        <span>תפריט תזונה</span>
+      </button>
+      <div class="nav-section">מעקב</div>
+      <button class="nav-item" data-page="progress" onclick="navigateTo('progress')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>התקדמות</span>
+      </button>
+      <button class="nav-item" data-page="photos" onclick="navigateTo('photos')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span>תמונות התקדמות</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar">נ</div>
+        <div>
+          <div class="user-name">נתנאל</div>
+          <div class="user-goal">חיטוב</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+
+    <!-- Chat -->
+    <div id="chat-page" class="page active">
+      <div class="page-header">
+        <div class="page-title">💬 המאמן שלך</div>
+        <div class="page-sub">שאל כל שאלה, קבל תוכנית, העלה תמונות לניתוח</div>
+      </div>
+      <div id="chat-messages"></div>
+      <div id="chat-input-area">
+        <div id="img-preview" class="img-preview"></div>
+        <div class="chat-input-row">
+          <textarea id="chat-text" rows="1" placeholder="כתוב הודעה..."></textarea>
+          <div class="chat-actions">
+            <button class="img-btn" onclick="document.getElementById('file-input').click()" title="העלה תמונה">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
+            <button class="send-btn" id="send-btn" onclick="sendChat()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+            </button>
+          </div>
+        </div>
+        <input type="file" id="file-input" accept="image/*" multiple>
+      </div>
+    </div>
+
+    <!-- Training -->
+    <div id="training-page" class="page">
+      <div class="page-header">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="page-title">🏋️ תוכנית אימונים</div>
+            <div class="page-sub">תוכנית שבועית מותאמת אישית</div>
+          </div>
+          <button class="btn btn-accent" onclick="askTrainingPlan()">צור תוכנית ↗</button>
+        </div>
+      </div>
+      <div class="page-content">
+        <div class="section-title">השבוע</div>
+        <div class="week-grid" id="week-grid"></div>
+        <div class="divider"></div>
+        <div id="day-exercises"></div>
+      </div>
+    </div>
+
+    <!-- Nutrition -->
+    <div id="nutrition-page" class="page">
+      <div class="page-header">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="page-title">🥗 תפריט תזונה</div>
+            <div class="page-sub">תפריט יומי מחושב לפי המטרות שלך</div>
+          </div>
+          <button class="btn btn-accent" onclick="askNutritionPlan()">צור תפריט ↗</button>
+        </div>
+      </div>
+      <div class="page-content" id="nutrition-content"></div>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress-page" class="page">
+      <div class="page-header">
+        <div class="page-title">📈 התקדמות</div>
+        <div class="page-sub">מעקב משקל, מדדים ואחוזי שומן</div>
+      </div>
+      <div class="page-content">
+        <div id="stats-cards" class="cards-grid" style="margin-bottom:20px"></div>
+        <div class="chart-wrap">
+          <div class="chart-title">
+            <span>גרף משקל</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost" style="padding:4px 12px;font-size:12px" onclick="setChartRange(30)">30י'</button>
+              <button class="btn btn-ghost" style="padding:4px 12px;font-size:12px" onclick="setChartRange(90)">90י'</button>
+            </div>
+          </div>
+          <div class="chart-area"><canvas id="weight-chart"></canvas></div>
+        </div>
+        <div class="log-form">
+          <h3>הוסף מדידה חדשה</h3>
+          <div class="form-row">
+            <div class="form-group"><label>משקל (ק"ג)</label><input type="number" id="log-weight" placeholder="75.5" step="0.1"></div>
+            <div class="form-group"><label>אחוז שומן (%)</label><input type="number" id="log-fat" placeholder="18" step="0.1"></div>
+            <div class="form-group"><label>היקף מותן (ס"מ)</label><input type="number" id="log-waist" placeholder="80"></div>
+            <div class="form-group"><label>היקף חזה (ס"מ)</label><input type="number" id="log-chest" placeholder="95"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>היקף זרוע (ס"מ)</label><input type="number" id="log-arm" placeholder="35"></div>
+            <div class="form-group"><label>היקף ירך (ס"מ)</label><input type="number" id="log-thigh" placeholder="55"></div>
+            <div class="form-group" style="display:flex;align-items:flex-end"><button class="btn btn-accent" onclick="logMeasurement()">שמור מדידה</button></div>
+          </div>
+        </div>
+        <div class="section-title">היסטוריית מדידות</div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+    <!-- Photos -->
+    <div id="photos-page" class="page">
+      <div class="page-header">
+        <div class="page-title">📸 תמונות התקדמות</div>
+        <div class="page-sub">תיעוד חזותי + ניתוח AI של גוף</div>
+      </div>
+      <div class="page-content">
+        <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-accent" onclick="document.getElementById('photo-input').click()">+ הוסף תמונה</button>
+          <button class="btn btn-ghost" onclick="analyzeLatestPhoto()">🔍 ניתוח AI ↗</button>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" multiple>
+        <div class="photos-grid" id="photos-grid"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ── Config ──────────────────────────────────────────────
+const MODEL = 'claude-sonnet-4-5-20251022';
+
+const SYSTEM = `אתה "COACH AI" — מאמן כושר אישי מקצועי ומנוסה. אתה מדבר עברית בצורה טבעית, ישירה ואנרגטית.
+
+**פרופיל המשתמש:** נתנאל | מטרה: חיטוב | מחויב לאימוני כוח, תזונה ומעקב.
+
+**כללים:**
+- אסוף נתונים לפני שאתה בונה תוכנית (גיל, משקל, גובה, ניסיון, ציוד, לוח זמנים, העדפות אוכל)
+- תן תשובות מדויקות, מבוססות מדע וספציפיות
+- השתמש ב-markdown: **בולד**, # כותרות, - רשימות
+- כשאתה בונה תוכנית אימונים שלמה — כתוב אותה **וגם** קרא ל-save_training_plan
+- כשאתה בונה תפריט תזונה שלם — כתוב אותו **וגם** קרא ל-save_nutrition_plan
+- כשמעלים תמונת גוף — נתח מקצועית: אחוז שומן משוער, שרירים, אזורים לשיפור, המלצות
+- היה ישיר, תמציתי ומעודד`;
+
+const TOOLS = [
+  {
+    name: 'save_training_plan',
+    description: 'שמור תוכנית אימוני כוח שבועית לאפליקציה. קרא תמיד כשבונה תוכנית שלמה.',
+    input_schema: {
+      type: 'object', required: ['days'],
+      properties: {
+        days: {
+          type: 'array',
+          items: {
+            type: 'object', required: ['index', 'name', 'type', 'rest'],
+            properties: {
+              index: { type: 'number', description: '0=ראשון 1=שני 2=שלישי 3=רביעי 4=חמישי 5=שישי 6=שבת' },
+              name: { type: 'string' },
+              type: { type: 'string', description: 'שם האימון, למשל: חזה + טרייספס' },
+              rest: { type: 'boolean' },
+              exercises: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    sets: { type: 'number' },
+                    reps: { type: 'string' },
+                    rest: { type: 'string' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    name: 'save_nutrition_plan',
+    description: 'שמור תפריט תזונה יומי לאפליקציה. קרא תמיד כשבונה תפריט שלם.',
+    input_schema: {
+      type: 'object', required: ['calories', 'protein', 'carbs', 'fat', 'meals'],
+      properties: {
+        calories: { type: 'number' },
+        protein: { type: 'number' },
+        carbs: { type: 'number' },
+        fat: { type: 'number' },
+        meals: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              cals: { type: 'number' },
+              items: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    macros: { type: 'string', description: 'למשל: 300 קל | 25ח | 10פ | 8ש' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+];
+
+// ── State ────────────────────────────────────────────────
+let apiKey = localStorage.getItem('coach_api_key') || '';
+let history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+let measurements = JSON.parse(localStorage.getItem('measurements') || '[]');
+let progressPhotos = JSON.parse(localStorage.getItem('progress_photos') || '[]');
+let trainingPlan = JSON.parse(localStorage.getItem('training_plan') || 'null');
+let nutritionPlan = JSON.parse(localStorage.getItem('nutrition_plan') || 'null');
+let pendingImages = [];
+let weightChart = null;
+let chartRange = 30;
+const todayIndex = new Date().getDay(); // 0=Sunday
+
+// ── API Key ──────────────────────────────────────────────
+function checkApiKey() {
+  if (!apiKey) document.getElementById('key-overlay').style.display = 'flex';
+}
+function saveApiKey() {
+  const val = document.getElementById('key-input').value.trim();
+  if (!val.startsWith('sk-')) { showToast('מפתח לא תקין — חייב להתחיל ב-sk-'); return; }
+  apiKey = val;
+  localStorage.setItem('coach_api_key', apiKey);
+  document.getElementById('key-overlay').style.display = 'none';
+  showToast('✅ מפתח נשמר!');
+}
+document.getElementById('key-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveApiKey(); });
+
+// ── Navigation ───────────────────────────────────────────
+function navigateTo(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(id + '-page').classList.add('active');
+  const btn = document.querySelector(`.nav-item[data-page="${id}"]`);
+  if (btn) btn.classList.add('active');
+  if (id === 'progress') renderProgress();
+  if (id === 'training') renderTraining();
+  if (id === 'nutrition') renderNutrition();
+  if (id === 'photos') renderPhotos();
+}
+
+// ── Toast ─────────────────────────────────────────────────
+function showToast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Markdown renderer ─────────────────────────────────────
+function renderMarkdown(text) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = s => esc(s)
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:12px;font-family:monospace">$1</code>');
+
+  const lines = text.split('\n');
+  let html = '';
+  let inList = false;
+
+  for (const raw of lines) {
+    const t = raw.trim();
+    if (t.match(/^### /)) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div style="font-weight:700;color:var(--accent);margin:10px 0 3px;font-size:13px">${inline(t.slice(4))}</div>`;
+    } else if (t.match(/^## /)) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div style="font-weight:900;margin:12px 0 5px;font-size:15px">${inline(t.slice(3))}</div>`;
+    } else if (t.match(/^# /)) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div style="font-weight:900;margin:14px 0 6px;font-size:17px">${inline(t.slice(2))}</div>`;
+    } else if (t.match(/^[-•*] /)) {
+      if (!inList) { html += '<ul style="padding-right:18px;margin:4px 0">'; inList = true; }
+      html += `<li style="margin:3px 0">${inline(t.slice(2))}</li>`;
+    } else if (t.match(/^\d+\. /)) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div style="margin:3px 0 3px 4px">${inline(t.replace(/^\d+\. /, '• '))}</div>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += t === '' ? '<div style="height:6px"></div>' : `<div>${inline(raw)}</div>`;
+    }
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
+// ── Chat ──────────────────────────────────────────────────
+function renderChatHistory() {
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = '';
+  history.forEach(m => appendBubble(m.role === 'assistant' ? 'agent' : 'user', m.content, m.images));
+  if (!history.length) {
+    appendBubble('agent', 'שלום נתנאל! אני COACH AI, המאמן האישי שלך 💪\n\nאני כאן כדי לבנות איתך תוכנית חיטוב מותאמת — אימונים, תזונה ומעקב.\n\nלפני שנתחיל, ספר לי: **מה הגיל, הגובה והמשקל שלך?** וכמה שנות ניסיון בחדר כושר?');
+  }
+}
+
+function appendBubble(role, text, images) {
+  if (!text && !(images && images.length)) return;
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'agent');
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  av.textContent = role === 'user' ? 'נ' : 'M';
+  const bub = document.createElement('div');
+  bub.className = 'msg-bubble';
+  if (images && images.length) {
+    images.forEach(src => {
+      const im = document.createElement('img');
+      im.src = src;
+      im.style.cssText = 'max-width:160px;border-radius:8px;margin-bottom:6px;display:block';
+      bub.appendChild(im);
+    });
+  }
+  if (text) {
+    if (role === 'user') {
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'white-space:pre-wrap;font-family:inherit';
+      pre.textContent = text;
+      bub.appendChild(pre);
+    } else {
+      const inner = document.createElement('div');
+      inner.innerHTML = renderMarkdown(text);
+      bub.appendChild(inner);
+    }
+  }
+  div.appendChild(av);
+  div.appendChild(bub);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function createStreamBubble() {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg agent';
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  av.textContent = 'M';
+  const bub = document.createElement('div');
+  bub.className = 'msg-bubble';
+  bub.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  div.appendChild(av);
+  div.appendChild(bub);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return bub;
+}
+
+function updateStreamBubble(bub, text) {
+  bub.innerHTML = renderMarkdown(text);
+  document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+}
+
+function buildMessages(hist) {
+  return hist.map(m => {
+    const role = m.role === 'assistant' ? 'assistant' : 'user';
+    if (m.images && m.images.length) {
+      const content = [];
+      m.images.forEach(src => {
+        const b64 = src.split(',')[1];
+        const mime = src.match(/data:([^;]+)/)[1];
+        content.push({ type: 'image', source: { type: 'base64', media_type: mime, data: b64 } });
+      });
+      if (m.content) content.push({ type: 'text', text: m.content });
+      return { role, content };
+    }
+    return { role, content: m.content };
+  });
+}
+
+function handleToolUse(name, input) {
+  if (name === 'save_training_plan') {
+    const plan = {};
+    (input.days || []).forEach(d => {
+      plan[d.index] = { name: d.name, type: d.type, rest: !!d.rest, exercises: d.exercises || [] };
+    });
+    trainingPlan = plan;
+    localStorage.setItem('training_plan', JSON.stringify(plan));
+    showToast('✅ תוכנית אימונים נשמרה לאפליקציה!');
+  } else if (name === 'save_nutrition_plan') {
+    nutritionPlan = input;
+    localStorage.setItem('nutrition_plan', JSON.stringify(input));
+    showToast('✅ תפריט תזונה נשמר לאפליקציה!');
+  }
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chat-text');
+  const text = inp.value.trim();
+  if (!text && !pendingImages.length) return;
+  if (!apiKey) { checkApiKey(); return; }
+
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  inp.value = '';
+  inp.style.height = 'auto';
+
+  const imgData = [...pendingImages];
+  pendingImages = [];
+  document.getElementById('img-preview').innerHTML = '';
+
+  const msgText = text || 'אנא נתח את התמונה שצירפתי';
+  appendBubble('user', msgText, imgData.map(i => i.preview));
+  history.push({ role: 'user', content: msgText, images: imgData.map(i => i.preview) });
+  saveChat();
+
+  const bub = createStreamBubble();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 2048,
+        system: SYSTEM,
+        messages: buildMessages(history),
+        stream: true,
+        tools: TOOLS
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `שגיאה ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '', fullText = '';
+    let currentTool = null, currentToolJson = '';
+    const toolUses = [];
+
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (!payload || payload === '[DONE]') continue;
+        let ev;
+        try { ev = JSON.parse(payload); } catch { continue; }
+
+        if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
+          currentTool = { name: ev.content_block.name };
+          currentToolJson = '';
+        } else if (ev.type === 'content_block_delta') {
+          if (ev.delta?.type === 'text_delta') {
+            fullText += ev.delta.text;
+            updateStreamBubble(bub, fullText);
+          } else if (ev.delta?.type === 'input_json_delta' && currentTool) {
+            currentToolJson += ev.delta.partial_json;
+          }
+        } else if (ev.type === 'content_block_stop' && currentTool) {
+          try { toolUses.push({ name: currentTool.name, input: JSON.parse(currentToolJson) }); } catch {}
+          currentTool = null;
+        } else if (ev.type === 'message_stop') {
+          break outer;
+        }
+      }
+    }
+
+    if (!fullText && toolUses.length) {
+      fullText = '✅ בוצע — בדוק את הטאב הרלוונטי!';
+      updateStreamBubble(bub, fullText);
+    }
+
+    toolUses.forEach(t => handleToolUse(t.name, t.input));
+    history.push({ role: 'assistant', content: fullText });
+    saveChat();
+
+  } catch (e) {
+    updateStreamBubble(bub, '⚠️ שגיאה: ' + e.message);
+  }
+
+  btn.disabled = false;
+}
+
+function saveChat() { localStorage.setItem('chat_history', JSON.stringify(history.slice(-60))); }
+
+document.getElementById('chat-text').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+document.getElementById('chat-text').addEventListener('input', function () {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+document.getElementById('file-input').addEventListener('change', function () {
+  Array.from(this.files).forEach(f => {
+    const r = new FileReader();
+    r.onload = e => { pendingImages.push({ preview: e.target.result }); renderImgPreview(); };
+    r.readAsDataURL(f);
+  });
+  this.value = '';
+});
+
+function renderImgPreview() {
+  const prev = document.getElementById('img-preview');
+  prev.innerHTML = '';
+  pendingImages.forEach((img, i) => {
+    const wrap = document.createElement('div'); wrap.className = 'img-thumb';
+    const im = document.createElement('img'); im.src = img.preview;
+    const rm = document.createElement('button'); rm.className = 'img-remove'; rm.textContent = '×';
+    rm.onclick = () => { pendingImages.splice(i, 1); renderImgPreview(); };
+    wrap.appendChild(im); wrap.appendChild(rm); prev.appendChild(wrap);
+  });
+}
+
+// ── Training ──────────────────────────────────────────────
+const defaultPlan = {
+  0: { name: 'ראשון', type: 'חזה + טרייספס', exercises: [
+    { name: 'לחיצת חזה שוכב', sets: 4, reps: '8-10', rest: '90 שניות' },
+    { name: 'פרפר בפולי', sets: 3, reps: '12-15', rest: '60 שניות' },
+    { name: 'לחיצה צרה (טרייספס)', sets: 3, reps: '10-12', rest: '60 שניות' },
+    { name: 'פשיטת מרפק בפולי', sets: 3, reps: '12-15', rest: '45 שניות' },
+  ]},
+  1: { name: 'שני', type: 'גב + בייספס', exercises: [
+    { name: 'מתח רחב', sets: 4, reps: '6-10', rest: '90 שניות' },
+    { name: 'חתירה בישיבה', sets: 3, reps: '10-12', rest: '75 שניות' },
+    { name: 'כפיפת מרפק עם מוט', sets: 3, reps: '10-12', rest: '60 שניות' },
+    { name: 'פטיש (האמר)', sets: 3, reps: '12', rest: '45 שניות' },
+  ]},
+  2: { name: 'שלישי', type: 'מנוחה', exercises: [], rest: true },
+  3: { name: 'רביעי', type: 'כתפיים', exercises: [
+    { name: 'לחיצת כתפיים עם מוט', sets: 4, reps: '8-10', rest: '90 שניות' },
+    { name: 'הרמות צד', sets: 3, reps: '12-15', rest: '60 שניות' },
+    { name: 'הרמות קדמיות', sets: 3, reps: '12', rest: '60 שניות' },
+    { name: 'שכמיות (שרגס)', sets: 3, reps: '15', rest: '45 שניות' },
+  ]},
+  4: { name: 'חמישי', type: 'רגליים', exercises: [
+    { name: 'סקוואט', sets: 4, reps: '8-10', rest: '120 שניות' },
+    { name: 'לג פרס', sets: 3, reps: '12-15', rest: '90 שניות' },
+    { name: 'כפיפת ברך', sets: 3, reps: '12', rest: '60 שניות' },
+    { name: 'עלייה על קרסול', sets: 4, reps: '15-20', rest: '45 שניות' },
+  ]},
+  5: { name: 'שישי', type: 'HIIT / קרדיו', exercises: [
+    { name: 'ספרינטים (30 שניות × 10)', sets: 1, reps: '10 סיבובים', rest: '60 שניות' },
+    { name: 'קפיצות (Burpees)', sets: 3, reps: '15', rest: '45 שניות' },
+    { name: 'קפיצות ספרינטר', sets: 3, reps: '20', rest: '30 שניות' },
+  ]},
+  6: { name: 'שבת', type: 'מנוחה', exercises: [], rest: true },
+};
+
+let selectedDay = todayIndex;
+
+function renderTraining() {
+  const plan = trainingPlan || defaultPlan;
+  const grid = document.getElementById('week-grid');
+  grid.innerHTML = '';
+  Object.entries(plan).forEach(([i, d]) => {
+    const idx = parseInt(i);
+    const card = document.createElement('div');
+    const classes = ['day-card'];
+    if (d.rest) classes.push('rest');
+    if (idx === selectedDay) classes.push('active');
+    if (idx === todayIndex) classes.push('today');
+    card.className = classes.join(' ');
+    card.onclick = () => { selectedDay = idx; renderTraining(); };
+    card.innerHTML = `<div class="day-name">${d.name}${idx === todayIndex ? ' •' : ''}</div><div class="day-type ${d.rest ? 'rest-type' : 'workout'}">${d.type}</div>`;
+    grid.appendChild(card);
+  });
+  const exDiv = document.getElementById('day-exercises');
+  const day = plan[selectedDay];
+  if (!day || day.rest || !day.exercises.length) {
+    exDiv.innerHTML = '<div class="plan-placeholder"><div class="ph-icon">😴</div><p>יום מנוחה — התאוששות חשובה כמו האימון!</p></div>';
+    return;
+  }
+  exDiv.innerHTML = `<div class="section-title">${day.name} — ${day.type}</div><div class="exercise-list">` +
+    day.exercises.map((e, i) =>
+      `<div class="exercise-item"><div class="ex-num">${i + 1}</div><div class="ex-info"><div class="ex-name">${e.name}</div><div class="ex-detail">${e.sets} סטים × ${e.reps}</div></div><div class="ex-badge">מנוחה ${e.rest}</div></div>`
+    ).join('') + '</div>';
+}
+
+function askTrainingPlan() {
+  navigateTo('chat');
+  document.getElementById('chat-text').value = 'בנה לי תוכנית אימוני כוח שבועית מלאה לחיטוב';
+  sendChat();
+}
+
+// ── Nutrition ─────────────────────────────────────────────
+const defaultNutrition = {
+  calories: 2200, protein: 175, carbs: 220, fat: 65,
+  meals: [
+    { name: 'ארוחת בוקר', cals: 500, items: [
+      { name: 'שיבולת שועל (80ג)', macros: '300 קל | 10ח | 54פ | 6ש' },
+      { name: 'ביצים × 3 (מקושקשות)', macros: '210 קל | 18ח | 1פ | 15ש' },
+    ]},
+    { name: 'ארוחת ביניים', cals: 300, items: [
+      { name: 'גביע יוגורט יווני (200ג)', macros: '130 קל | 17ח | 10פ | 4ש' },
+      { name: 'פרי (בננה)', macros: '90 קל | 1ח | 23פ | 0ש' },
+    ]},
+    { name: 'ארוחת צהריים', cals: 650, items: [
+      { name: 'חזה עוף (200ג)', macros: '330 קל | 62ח | 0פ | 7ש' },
+      { name: 'אורז מלא (100ג יבש)', macros: '350 קל | 8ח | 77פ | 3ש' },
+      { name: 'ירקות מוקפצים', macros: '60 קל | 4ח | 10פ | 1ש' },
+    ]},
+    { name: 'אחרי אימון', cals: 400, items: [
+      { name: 'שייק חלבון (30ג)', macros: '120 קל | 25ח | 3פ | 2ש' },
+      { name: 'בטטה (150ג)', macros: '130 קל | 3ח | 30פ | 0ש' },
+    ]},
+    { name: 'ארוחת ערב', cals: 550, items: [
+      { name: 'סלמון (180ג)', macros: '350 קל | 40ח | 0פ | 20ש' },
+      { name: 'ברוקולי + ירקות', macros: '60 קל | 5ח | 10פ | 1ש' },
+    ]},
+    { name: 'לפני שינה', cals: 200, items: [
+      { name: 'גבינה לבנה 5% (150ג)', macros: '150 קל | 18ח | 5פ | 6ש' },
+    ]},
+  ]
+};
+
+function renderNutrition() {
+  const plan = nutritionPlan || defaultNutrition;
+  document.getElementById('nutrition-content').innerHTML = `
+    <div class="cards-grid" style="margin-bottom:20px">
+      <div class="stat-card accent"><div class="stat-label">קלוריות יומיות</div><div class="stat-value">${plan.calories}</div><div class="stat-unit">קל/יום</div></div>
+      <div class="stat-card"><div class="stat-label">חלבון</div><div class="stat-value" style="color:#4488ff">${plan.protein}ג</div><div class="stat-unit">${Math.round(plan.protein * 4)} קלוריות</div></div>
+      <div class="stat-card"><div class="stat-label">פחמימות</div><div class="stat-value" style="color:var(--accent)">${plan.carbs}ג</div><div class="stat-unit">${Math.round(plan.carbs * 4)} קלוריות</div></div>
+      <div class="stat-card"><div class="stat-label">שומן</div><div class="stat-value" style="color:#ff8844">${plan.fat}ג</div><div class="stat-unit">${Math.round(plan.fat * 9)} קלוריות</div></div>
+    </div>
+    ${plan.meals.map(m => `
+      <div class="meal-card">
+        <div class="meal-header"><div class="meal-name">${m.name}</div><div class="meal-cals">${m.cals} קל</div></div>
+        <div class="food-list">${m.items.map(it => `<div class="food-row"><div class="food-name">${it.name}</div><div class="food-macros">${it.macros}</div></div>`).join('')}</div>
+      </div>`).join('')}
+    <div style="margin-top:16px"><button class="btn btn-ghost" onclick="askNutritionPlan()">🔄 בקש תפריט מותאם אישית ↗</button></div>`;
+}
+
+function askNutritionPlan() {
+  navigateTo('chat');
+  document.getElementById('chat-text').value = 'בנה לי תפריט תזונה יומי מפורט לחיטוב';
+  sendChat();
+}
+
+// ── Progress ──────────────────────────────────────────────
+function renderProgress() {
+  const last = measurements[measurements.length - 1];
+  const prev = measurements[measurements.length - 2];
+  const cards = document.getElementById('stats-cards');
+  cards.innerHTML = '';
+  [
+    { label: 'משקל נוכחי', val: last?.weight || '—', unit: 'ק"ג', diff: last?.weight && prev?.weight ? last.weight - prev.weight : null, lowerBetter: true },
+    { label: 'אחוז שומן', val: last?.fat || '—', unit: '%', diff: last?.fat && prev?.fat ? last.fat - prev.fat : null, lowerBetter: true },
+    { label: 'היקף מותן', val: last?.waist || '—', unit: 'ס"מ', diff: last?.waist && prev?.waist ? last.waist - prev.waist : null, lowerBetter: true },
+    { label: 'היקף חזה', val: last?.chest || '—', unit: 'ס"מ', diff: null },
+  ].forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'stat-card' + (s.label === 'משקל נוכחי' ? ' accent' : '');
+    let changeHtml = '';
+    if (s.diff !== null) {
+      const n = parseFloat(s.diff.toFixed(1));
+      const good = s.lowerBetter ? n < 0 : n > 0;
+      changeHtml = `<div class="stat-change ${good ? 'good' : 'bad'}">${n > 0 ? '↑' : '↓'} ${Math.abs(n)} ${s.unit}</div>`;
+    }
+    card.innerHTML = `<div class="stat-label">${s.label}</div><div class="stat-value">${s.val}</div><div class="stat-unit">${s.unit}</div>${changeHtml}`;
+    cards.appendChild(card);
+  });
+  renderChart();
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  if (!measurements.length) {
+    list.innerHTML = '<div class="empty-state"><p>עדיין אין מדידות. הוסף את המדידה הראשונה שלך!</p></div>';
+    return;
+  }
+  list.innerHTML = [...measurements].reverse().map(m => `
+    <div class="stat-card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-size:12px;color:var(--text2)">${new Date(m.date).toLocaleDateString('he-IL')}</div>
+      ${m.weight ? `<div><div style="font-size:11px;color:var(--text3)">משקל</div><div style="font-weight:700">${m.weight} ק"ג</div></div>` : ''}
+      ${m.fat ? `<div><div style="font-size:11px;color:var(--text3)">שומן</div><div style="font-weight:700">${m.fat}%</div></div>` : ''}
+      ${m.waist ? `<div><div style="font-size:11px;color:var(--text3)">מותן</div><div style="font-weight:700">${m.waist} ס"מ</div></div>` : ''}
+      ${m.arm ? `<div><div style="font-size:11px;color:var(--text3)">זרוע</div><div style="font-weight:700">${m.arm} ס"מ</div></div>` : ''}
+    </div>`).join('');
+}
+
+function renderChart() {
+  const ctx = document.getElementById('weight-chart').getContext('2d');
+  const now = new Date();
+  const filtered = measurements.filter(m => m.weight && (now - new Date(m.date)) / 86400000 <= chartRange);
+  if (weightChart) weightChart.destroy();
+  weightChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: filtered.map(m => new Date(m.date).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })),
+      datasets: [{ data: filtered.map(m => m.weight), borderColor: '#c8f230', backgroundColor: 'rgba(200,242,48,0.08)', tension: 0.4, pointBackgroundColor: '#c8f230', pointRadius: 4, fill: true }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#555', font: { family: 'Heebo', size: 11 } }, grid: { color: '#1e1e1e' } },
+        y: { ticks: { color: '#555', font: { family: 'Heebo', size: 11 } }, grid: { color: '#1e1e1e' } }
+      }
+    }
+  });
+}
+
+function setChartRange(r) { chartRange = r; renderChart(); }
+
+function logMeasurement() {
+  const get = id => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v; };
+  const w = get('log-weight'), f = get('log-fat');
+  if (!w && !f) { showToast('הכנס לפחות משקל או אחוז שומן'); return; }
+  measurements.push({ date: new Date().toISOString(), weight: w, fat: f, waist: get('log-waist'), chest: get('log-chest'), arm: get('log-arm'), thigh: get('log-thigh') });
+  localStorage.setItem('measurements', JSON.stringify(measurements));
+  ['log-weight', 'log-fat', 'log-waist', 'log-chest', 'log-arm', 'log-thigh'].forEach(id => document.getElementById(id).value = '');
+  renderProgress();
+  showToast('✅ מדידה נשמרה!');
+}
+
+// ── Photos ────────────────────────────────────────────────
+function renderPhotos() {
+  const grid = document.getElementById('photos-grid');
+  grid.innerHTML = progressPhotos.map(p => `
+    <div class="photo-card">
+      <img class="photo-img" src="${p.src}">
+      <div class="photo-meta">
+        <div class="photo-date">${new Date(p.date).toLocaleDateString('he-IL')}</div>
+        <div class="photo-weight">${p.weight ? p.weight + ' ק"ג' : ''}</div>
+      </div>
+    </div>`).join('') +
+    `<div class="add-photo-card" onclick="document.getElementById('photo-input').click()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span>הוסף תמונה</span>
+    </div>`;
+}
+
+document.getElementById('photo-input').addEventListener('change', function () {
+  Array.from(this.files).forEach(f => {
+    const r = new FileReader();
+    r.onload = e => {
+      const weight = prompt('מה המשקל שלך היום? (ק"ג)');
+      progressPhotos.push({ src: e.target.result, date: new Date().toISOString(), weight: weight ? parseFloat(weight) : null });
+      try {
+        localStorage.setItem('progress_photos', JSON.stringify(progressPhotos));
+      } catch {
+        showToast('⚠️ האחסון מלא — מחק תמונות ישנות');
+        progressPhotos.pop();
+      }
+      renderPhotos();
+    };
+    r.readAsDataURL(f);
+  });
+  this.value = '';
+});
+
+function analyzeLatestPhoto() {
+  if (!progressPhotos.length) { showToast('אין תמונות — הוסף קודם'); return; }
+  navigateTo('chat');
+  pendingImages = [{ preview: progressPhotos[progressPhotos.length - 1].src }];
+  renderImgPreview();
+  document.getElementById('chat-text').value = 'נתח את הגוף שלי בתמונה — אחוז שומן משוער, אזורים עם שריר, ומה לשפר';
+  sendChat();
+}
+
+// ── Init ──────────────────────────────────────────────────
+checkApiKey();
+renderChatHistory();
+renderTraining();
+</script>
+</body>
+</html>
