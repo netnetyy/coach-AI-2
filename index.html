@@ -1192,12 +1192,15 @@ const defaultPlan = {
 
 let selectedDay = todayIndex;
 
+const DAY_NAMES = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+
 function renderTraining() {
   const plan = trainingPlan || defaultPlan;
   const grid = document.getElementById('week-grid');
   grid.innerHTML = '';
   Object.entries(plan).forEach(([i, d]) => {
     const idx = parseInt(i);
+    const dayName = d.name || DAY_NAMES[idx] || `יום ${idx + 1}`;
     const classes = ['day-card'];
     if (d.rest) classes.push('rest');
     if (idx === selectedDay) classes.push('active');
@@ -1205,7 +1208,7 @@ function renderTraining() {
     const card = document.createElement('div');
     card.className = classes.join(' ');
     card.onclick = () => { selectedDay = idx; renderTraining(); };
-    card.innerHTML = `<div class="day-name">${d.name}${idx === todayIndex ? ' •' : ''}</div><div class="day-type ${d.rest ? 'rest-type' : 'workout'}">${d.type}</div>`;
+    card.innerHTML = `<div class="day-name">${dayName}${idx === todayIndex ? ' •' : ''}</div><div class="day-type ${d.rest ? 'rest-type' : 'workout'}">${d.type || ''}</div>`;
     grid.appendChild(card);
   });
   const exDiv = document.getElementById('day-exercises');
