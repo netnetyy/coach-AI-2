@@ -439,7 +439,77 @@ canvas { width: 100% !important; }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+// ── Supabase ─────────────────────────────────────────────
+const SUPA_URL = 'https://lkhrjdobbmslgjpvluqr.supabase.co';
+const SUPA_KEY = 'sb_publishable_KJUdLvS6yPKUpUMkW4Z04w_PxbMKGla';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+function getUserKey() {
+  // Use first 32 chars of API key as unique identifier (entered same on all devices)
+  return apiKey ? 'user_' + apiKey.slice(-32) : null;
+}
+
+async function syncUp(dataType, data) {
+  const userKey = getUserKey();
+  if (!userKey) return;
+  try {
+    await supa.from('coach_data').upsert({
+      user_key: userKey,
+      data_type: dataType,
+      data: data,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_key,data_type' });
+  } catch {}
+}
+
+async function loadFromSupabase() {
+  const userKey = getUserKey();
+  if (!userKey) return;
+  try {
+    const { data, error } = await supa.from('coach_data').select('*').eq('user_key', userKey);
+    if (error || !data) return;
+    data.forEach(row => {
+      switch (row.data_type) {
+        case 'profile':
+          userProfile = row.data;
+          localStorage.setItem('user_profile', JSON.stringify(userProfile));
+          break;
+        case 'measurements':
+          measurements = row.data;
+          localStorage.setItem('measurements', JSON.stringify(measurements));
+          break;
+        case 'memory':
+          memory = row.data;
+          localStorage.setItem('coach_memory', JSON.stringify(memory));
+          break;
+        case 'training_plan':
+          trainingPlan = row.data;
+          localStorage.setItem('training_plan', JSON.stringify(trainingPlan));
+          break;
+        case 'nutrition_plan':
+          nutritionPlan = row.data;
+          localStorage.setItem('nutrition_plan', JSON.stringify(nutritionPlan));
+          break;
+        case 'chat_history':
+          history = row.data;
+          localStorage.setItem('chat_history', JSON.stringify(history));
+          break;
+      }
+    });
+    // Refresh UI with synced data
+    if (userProfile?.name) {
+      document.getElementById('sidebar-name').textContent = userProfile.name;
+      document.getElementById('sidebar-avatar').textContent = userProfile.name[0];
+    }
+    if (userProfile?.goal) document.getElementById('sidebar-goal').textContent = userProfile.goal;
+    renderChatHistory();
+    renderTraining();
+    showToast('☁️ נתונים סונכרנו!');
+  } catch {}
+}
+
 // ── Config ──────────────────────────────────────────────
 const MODEL = 'claude-sonnet-4-6';
 
@@ -624,6 +694,7 @@ function saveApiKey() {
   localStorage.setItem('coach_api_key', apiKey);
   document.getElementById('key-overlay').style.display = 'none';
   showToast('✅ מפתח נשמר!');
+  loadFromSupabase(); // טעון נתונים מהענן אחרי הכנסת המפתח
 }
 document.getElementById('key-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveApiKey(); });
 
@@ -775,6 +846,7 @@ function handleToolUse(name, input) {
   if (name === 'update_profile') {
     Object.keys(input).forEach(k => { if (input[k]) userProfile[k] = input[k]; });
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
+    syncUp('profile', userProfile);
     // Update sidebar
     if (userProfile.name) {
       document.getElementById('sidebar-name').textContent = userProfile.name;
@@ -787,6 +859,7 @@ function handleToolUse(name, input) {
   } else if (name === 'update_memory') {
     memory[input.key] = input.value;
     localStorage.setItem('coach_memory', JSON.stringify(memory));
+    syncUp('memory', memory);
     if (document.getElementById('profile-page').classList.contains('active')) renderMemory();
   } else if (name === 'save_training_plan') {
     const plan = {};
@@ -795,10 +868,12 @@ function handleToolUse(name, input) {
     });
     trainingPlan = plan;
     localStorage.setItem('training_plan', JSON.stringify(plan));
+    syncUp('training_plan', plan);
     showToast('✅ תוכנית אימונים נשמרה!');
   } else if (name === 'save_nutrition_plan') {
     nutritionPlan = input;
     localStorage.setItem('nutrition_plan', JSON.stringify(input));
+    syncUp('nutrition_plan', input);
     showToast('✅ תפריט תזונה נשמר!');
   }
 }
@@ -919,7 +994,11 @@ async function sendChat() {
   btn.disabled = false;
 }
 
-function saveChat() { localStorage.setItem('chat_history', JSON.stringify(history.slice(-60))); }
+function saveChat() {
+  const h = history.slice(-60);
+  localStorage.setItem('chat_history', JSON.stringify(h));
+  syncUp('chat_history', h);
+}
 
 document.getElementById('chat-text').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
@@ -983,6 +1062,7 @@ function saveProfile() {
     supplements: document.getElementById('p-supplements').value.trim(),
   };
   localStorage.setItem('user_profile', JSON.stringify(userProfile));
+  syncUp('profile', userProfile);
   // Update sidebar
   if (userProfile.name) {
     document.getElementById('sidebar-name').textContent = userProfile.name;
@@ -1231,6 +1311,7 @@ function logMeasurement() {
   if (!w && !f) { showToast('הכנס לפחות משקל או אחוז שומן'); return; }
   measurements.push({ date: new Date().toISOString(), weight: w, fat: f, waist: get('log-waist'), chest: get('log-chest'), arm: get('log-arm'), thigh: get('log-thigh') });
   localStorage.setItem('measurements', JSON.stringify(measurements));
+  syncUp('measurements', measurements);
   ['log-weight','log-fat','log-waist','log-chest','log-arm','log-thigh'].forEach(id => document.getElementById(id).value = '');
   renderProgress();
   showToast('✅ מדידה נשמרה!');
@@ -1278,7 +1359,6 @@ function analyzeLatestPhoto() {
 }
 
 // ── Init ──────────────────────────────────────────────────
-// Update sidebar from profile
 if (userProfile?.name) {
   document.getElementById('sidebar-name').textContent = userProfile.name;
   document.getElementById('sidebar-avatar').textContent = userProfile.name[0];
@@ -1288,6 +1368,9 @@ if (userProfile?.goal) document.getElementById('sidebar-goal').textContent = use
 checkApiKey();
 renderChatHistory();
 renderTraining();
+
+// אם יש מפתח — טען מהענן
+if (apiKey) loadFromSupabase();
 </script>
 </body>
 </html>
