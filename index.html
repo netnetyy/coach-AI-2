@@ -847,35 +847,51 @@ function handleToolUse(name, input) {
     Object.keys(input).forEach(k => { if (input[k]) userProfile[k] = input[k]; });
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
     syncUp('profile', userProfile);
-    // Update sidebar
     if (userProfile.name) {
       document.getElementById('sidebar-name').textContent = userProfile.name;
       document.getElementById('sidebar-avatar').textContent = userProfile.name[0];
     }
     if (userProfile.goal) document.getElementById('sidebar-goal').textContent = userProfile.goal;
-    // Refresh profile page if open
     if (document.getElementById('profile-page').classList.contains('active')) renderProfile();
-    showToast('✅ פרופיל עודכן מהשיחה!');
+    showToast('✅ פרופיל עודכן!');
+    return null;
   } else if (name === 'update_memory') {
     memory[input.key] = input.value;
     localStorage.setItem('coach_memory', JSON.stringify(memory));
     syncUp('memory', memory);
     if (document.getElementById('profile-page').classList.contains('active')) renderMemory();
+    return null;
   } else if (name === 'save_training_plan') {
     const plan = {};
     (input.days || []).forEach(d => {
       plan[d.index] = { name: d.name, type: d.type, rest: !!d.rest, exercises: d.exercises || [] };
     });
+    if (Object.keys(plan).length === 0) return null; // JSON parse was empty
     trainingPlan = plan;
     localStorage.setItem('training_plan', JSON.stringify(plan));
     syncUp('training_plan', plan);
-    showToast('✅ תוכנית אימונים נשמרה!');
+    showToastWithAction('✅ תוכנית אימונים נשמרה!', 'צפה בתוכנית', () => navigateTo('training'));
+    return null;
   } else if (name === 'save_nutrition_plan') {
+    if (!input.calories) return null; // JSON parse was incomplete
     nutritionPlan = input;
     localStorage.setItem('nutrition_plan', JSON.stringify(input));
     syncUp('nutrition_plan', input);
-    showToast('✅ תפריט תזונה נשמר!');
+    showToastWithAction('✅ תפריט תזונה נשמר!', 'צפה בתפריט', () => navigateTo('nutrition'));
+    return null;
   }
+  return null;
+}
+
+function showToastWithAction(msg, actionLabel, actionFn) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.cssText = 'display:flex;align-items:center;gap:12px;pointer-events:all;cursor:default';
+  t.innerHTML = `<span>${msg}</span><button onclick="" style="background:#000;color:var(--accent);border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">${actionLabel} →</button>`;
+  t.querySelector('button').onclick = () => { t.remove(); actionFn(); };
+  document.body.appendChild(t);
+  setTimeout(() => { if (t.parentNode) t.remove(); }, 5000);
 }
 
 async function sendChat() {
@@ -926,7 +942,8 @@ async function sendChat() {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '', fullText = '';
-    let currentTool = null, currentToolJson = '';
+    // Track tools by block index to handle interleaved thinking correctly
+    const toolBlocks = {}; // index -> { name, json }
     const toolUses = [];
     let isThinking = false;
 
@@ -944,6 +961,8 @@ async function sendChat() {
         let ev;
         try { ev = JSON.parse(payload); } catch { continue; }
 
+        const idx = ev.index ?? 0;
+
         if (ev.type === 'content_block_start') {
           const cb = ev.content_block;
           if (cb?.type === 'thinking') {
@@ -953,23 +972,32 @@ async function sendChat() {
             isThinking = false;
           } else if (cb?.type === 'tool_use') {
             isThinking = false;
-            currentTool = { name: cb.name };
-            currentToolJson = '';
+            toolBlocks[idx] = { name: cb.name, json: '' };
             if (cb.name === 'web_search') updateStreamBubble(bub, fullText + '\n\n🔍 *מחפש באינטרנט...*', false);
           } else if (cb?.type === 'server_tool_use' && cb?.name === 'web_search') {
             updateStreamBubble(bub, fullText + '\n\n🔍 *מחפש באינטרנט...*', false);
           }
         } else if (ev.type === 'content_block_delta') {
           if (ev.delta?.type === 'text_delta') {
+            isThinking = false;
             fullText += ev.delta.text;
             updateStreamBubble(bub, fullText, false);
-          } else if (ev.delta?.type === 'input_json_delta' && currentTool) {
-            currentToolJson += ev.delta.partial_json;
+          } else if (ev.delta?.type === 'thinking_delta') {
+            // ignore thinking text
+          } else if (ev.delta?.type === 'input_json_delta' && toolBlocks[idx]) {
+            toolBlocks[idx].json += ev.delta.partial_json || '';
           }
         } else if (ev.type === 'content_block_stop') {
-          if (currentTool) {
-            try { toolUses.push({ name: currentTool.name, input: JSON.parse(currentToolJson) }); } catch {}
-            currentTool = null;
+          if (toolBlocks[idx]) {
+            const tb = toolBlocks[idx];
+            try {
+              const parsed = JSON.parse(tb.json);
+              toolUses.push({ name: tb.name, input: parsed });
+            } catch (e) {
+              // JSON incomplete — try to salvage by wrapping
+              console.warn('Tool JSON parse failed for', tb.name, tb.json);
+            }
+            delete toolBlocks[idx];
           }
           if (isThinking) isThinking = false;
         } else if (ev.type === 'message_stop') {
@@ -978,12 +1006,22 @@ async function sendChat() {
       }
     }
 
-    if (!fullText && toolUses.length) {
-      fullText = '✅ בוצע — בדוק את הטאב הרלוונטי!';
-      updateStreamBubble(bub, fullText, false);
-    }
+    // Execute tool uses and build action summary for the bubble
+    const actions = [];
+    toolUses.forEach(t => {
+      const result = handleToolUse(t.name, t.input);
+      if (result) actions.push(result);
+    });
 
-    toolUses.forEach(t => handleToolUse(t.name, t.input));
+    if (!fullText && actions.length) {
+      fullText = actions.join('\n');
+    } else if (!fullText && toolUses.length) {
+      fullText = '✅ בוצע!';
+    }
+    if (actions.length) {
+      fullText = (fullText ? fullText + '\n\n' : '') + actions.join('\n');
+    }
+    updateStreamBubble(bub, fullText, false);
     history.push({ role: 'assistant', content: fullText });
     saveChat();
 
