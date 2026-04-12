@@ -237,12 +237,16 @@ canvas { width: 100% !important; }
             <button class="img-btn" onclick="document.getElementById('file-input').click()" title="העלה תמונה">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </button>
+            <button class="img-btn" onclick="document.getElementById('strong-input').click()" title="ייבא מ-Strong">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </button>
             <button class="send-btn" id="send-btn" onclick="sendChat()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
             </button>
           </div>
         </div>
         <input type="file" id="file-input" accept="image/*" multiple>
+        <input type="file" id="strong-input" accept=".csv">
       </div>
     </div>
 
@@ -353,9 +357,12 @@ const SYSTEM = `אתה "COACH AI" — מאמן כושר אישי ברמה עול
 - **כנות מקצועית**: אם השאלה מעבר לתחום (בעיה רפואית, תרופות) — הפנה לרופא. אל תתן הבטחות שווא
 - השתמש ב-markdown: **בולד**, # כותרות, - רשימות, טבלאות כשצריך
 - כשאתה בונה תוכנית אימונים שלמה — כתוב אותה **וגם** קרא ל-save_training_plan
-- כשאתה בונה תפריט תזונה שלם — כתוב אותו **וגם** קרא ל-save_nutrition_plan`;
+- כשאתה בונה תפריט תזונה שלם — כתוב אותו **וגם** קרא ל-save_nutrition_plan
+- **חיפוש באינטרנט**: השתמש ב-web_search כשצריך נתונים עדכניים — ערכים תזונתיים, מחקרים, מידע על תרגילים. תמיד בדוק לפני שאתה נותן מספרים ספציפיים שאינך בטוח לגביהם
+- **היסטוריית אימונים מ-Strong**: כשהמשתמש מעלה קובץ CSV מ-Strong — נתח את כל האימונים, זהה תבניות, עומסים, תדירות, ושתמש בזה כבסיס לתוכנית הבאה`;
 
 const TOOLS = [
+  { type: 'web_search_20250305', name: 'web_search' },
   {
     name: 'save_training_plan',
     description: 'שמור תוכנית אימוני כוח שבועית לאפליקציה. קרא תמיד כשבונה תוכנית שלמה.',
@@ -678,9 +685,15 @@ async function sendChat() {
         let ev;
         try { ev = JSON.parse(payload); } catch { continue; }
 
-        if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
-          currentTool = { name: ev.content_block.name };
-          currentToolJson = '';
+        if (ev.type === 'content_block_start') {
+          const cb = ev.content_block;
+          if (cb?.type === 'tool_use') {
+            currentTool = { name: cb.name };
+            currentToolJson = '';
+          } else if (cb?.type === 'server_tool_use' && cb?.name === 'web_search') {
+            // Show search indicator in the bubble
+            updateStreamBubble(bub, fullText + '\n\n🔍 *מחפש באינטרנט...*');
+          }
         } else if (ev.type === 'content_block_delta') {
           if (ev.delta?.type === 'text_delta') {
             fullText += ev.delta.text;
@@ -728,6 +741,30 @@ document.getElementById('file-input').addEventListener('change', function () {
     r.onload = e => { pendingImages.push({ preview: e.target.result }); renderImgPreview(); };
     r.readAsDataURL(f);
   });
+  this.value = '';
+});
+
+document.getElementById('strong-input').addEventListener('change', function () {
+  const f = this.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    const csv = e.target.result;
+    const lines = csv.split('\n').filter(l => l.trim());
+    const preview = lines.slice(0, 3).join('\n');
+    // Summarize: count unique workouts and date range
+    const dateCol = lines[0].split(',').findIndex(h => h.toLowerCase().includes('date'));
+    const nameCol = lines[0].split(',').findIndex(h => h.toLowerCase().includes('workout name') || h.toLowerCase().includes('exercise name'));
+    const dates = lines.slice(1).map(l => l.split(',')[dateCol]).filter(Boolean);
+    const from = dates[dates.length - 1]?.slice(0, 10) || '';
+    const to = dates[0]?.slice(0, 10) || '';
+    const totalRows = lines.length - 1;
+    const msg = `ייבאתי את היסטוריית האימונים שלי מ-Strong.\n\nסה"כ ${totalRows} שורות רשומות, בין התאריכים ${from} עד ${to}.\n\nהנה תחילת הקובץ לניתוח:\n\n${csv.slice(0, 8000)}`;
+    document.getElementById('chat-text').value = msg;
+    document.getElementById('chat-text').style.height = 'auto';
+    showToast('✅ קובץ Strong נטען — שלח כדי שהמאמן ינתח');
+  };
+  r.readAsText(f);
   this.value = '';
 });
 
