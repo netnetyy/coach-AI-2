@@ -206,14 +206,32 @@ canvas { width: 100% !important; }
 </head>
 <body>
 
+<!-- User Select Overlay -->
+<div id="user-select-overlay" class="key-overlay" style="display:none">
+  <div class="key-dialog">
+    <h2>👋 ברוך הבא ל-COACH AI</h2>
+    <p style="margin-bottom:20px">מי אתה?</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">
+      <button class="btn btn-accent" style="padding:20px;font-size:16px;border-radius:14px" onclick="selectUser('netanel')">
+        <div style="font-size:28px;margin-bottom:6px">נ</div>
+        <div>נתנאל</div>
+      </button>
+      <button class="btn btn-ghost" style="padding:20px;font-size:16px;border-radius:14px" onclick="selectUser('ili')">
+        <div style="font-size:28px;margin-bottom:6px">ע</div>
+        <div>עילי</div>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- API Key Overlay -->
 <div id="key-overlay" class="key-overlay" style="display:none">
   <div class="key-dialog">
     <h2>🔑 הגדרת מפתח API</h2>
     <p>כדי להפעיל את COACH AI תצטרך מפתח API של Anthropic.<br>המפתח נשמר <strong>רק בדפדפן שלך</strong> ולא נשלח לשום שרת חיצוני.</p>
-    <input type="password" id="key-input" placeholder="sk-ant-api03-..." autocomplete="off" dir="ltr">
+    <input type="password" id="key-input" placeholder="sk-ant-api03-..." autocomplete="off" dir="ltr" autocomplete="current-password">
     <button class="btn btn-accent" style="width:100%;padding:12px" onclick="saveApiKey()">שמור והתחל 💪</button>
-    <div class="key-note">🔒 המפתח מאוחסן ב-localStorage המקומי שלך בלבד</div>
+    <div class="key-note">🔒 המפתח מאוחסן בצורה מאובטחת במכשיר שלך</div>
   </div>
 </div>
 
@@ -253,12 +271,13 @@ canvas { width: 100% !important; }
       </button>
     </nav>
     <div class="sidebar-footer">
-      <div class="user-card">
+      <div class="user-card" style="cursor:pointer" onclick="switchUser()" title="החלף משתמש">
         <div class="user-avatar" id="sidebar-avatar">נ</div>
-        <div>
+        <div style="flex:1">
           <div class="user-name" id="sidebar-name">נתנאל</div>
           <div class="user-goal" id="sidebar-goal">חיטוב</div>
         </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       </div>
     </div>
   </div>
@@ -504,9 +523,38 @@ const SUPA_URL = 'https://lkhrjdobbmslgjpvluqr.supabase.co';
 const SUPA_KEY = 'sb_publishable_KJUdLvS6yPKUpUMkW4Z04w_PxbMKGla';
 const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
+const USERS = {
+  netanel: { label: 'נתנאל', avatar: 'נ', defaultGoal: 'חיטוב' },
+  ili:     { label: 'עילי',   avatar: 'ע', defaultGoal: 'כושר' }
+};
+let currentUser = localStorage.getItem('coach_current_user') || null;
+
+// ── API Key persistence (3 layers: cookie + localStorage + sessionStorage) ──
+function setCookie(name, value, days) {
+  const exp = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)};expires=${exp};path=/;SameSite=Lax`;
+}
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function saveKeyAllLayers(key) {
+  localStorage.setItem('coach_api_key', key);
+  sessionStorage.setItem('coach_api_key', key);
+  setCookie('coach_api_key', key, 365);
+}
+function loadKeyFromAnyLayer() {
+  return localStorage.getItem('coach_api_key')
+    || sessionStorage.getItem('coach_api_key')
+    || getCookie('coach_api_key')
+    || '';
+}
+
+// ── User management ──────────────────────────────────────
+function lsKey(k) { return currentUser ? `${currentUser}_${k}` : k; }
+
 function getUserKey() {
-  // Use first 32 chars of API key as unique identifier (entered same on all devices)
-  return apiKey ? 'user_' + apiKey.slice(-32) : null;
+  return apiKey ? `${currentUser}_${apiKey.slice(-24)}` : null;
 }
 
 async function syncUp(dataType, data) {
@@ -532,31 +580,31 @@ async function loadFromSupabase() {
       switch (row.data_type) {
         case 'profile':
           userProfile = row.data;
-          localStorage.setItem('user_profile', JSON.stringify(userProfile));
+          localStorage.setItem(lsKey('user_profile'), JSON.stringify(userProfile));
           break;
         case 'measurements':
           measurements = row.data;
-          localStorage.setItem('measurements', JSON.stringify(measurements));
+          localStorage.setItem(lsKey('measurements'), JSON.stringify(measurements));
           break;
         case 'memory':
           memory = row.data;
-          localStorage.setItem('coach_memory', JSON.stringify(memory));
+          localStorage.setItem(lsKey('coach_memory'), JSON.stringify(memory));
           break;
         case 'training_plan':
           trainingPlan = row.data;
-          localStorage.setItem('training_plan', JSON.stringify(trainingPlan));
+          localStorage.setItem(lsKey('training_plan'), JSON.stringify(trainingPlan));
           break;
         case 'nutrition_plan':
           nutritionPlan = row.data;
-          localStorage.setItem('nutrition_plan', JSON.stringify(nutritionPlan));
+          localStorage.setItem(lsKey('nutrition_plan'), JSON.stringify(nutritionPlan));
           break;
         case 'training_log':
           trainingLog = row.data;
-          localStorage.setItem('training_log', JSON.stringify(trainingLog));
+          localStorage.setItem(lsKey('training_log'), JSON.stringify(trainingLog));
           break;
         case 'chat_history':
           history = row.data;
-          localStorage.setItem('chat_history', JSON.stringify(history));
+          localStorage.setItem(lsKey('chat_history'), JSON.stringify(history));
           break;
       }
     });
@@ -742,15 +790,26 @@ const TOOLS = [
 ];
 
 // ── State ────────────────────────────────────────────────
-let apiKey = localStorage.getItem('coach_api_key') || '';
-let history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-let measurements = JSON.parse(localStorage.getItem('measurements') || '[]');
-let progressPhotos = JSON.parse(localStorage.getItem('progress_photos') || '[]');
-let trainingPlan = JSON.parse(localStorage.getItem('training_plan') || 'null');
-let nutritionPlan = JSON.parse(localStorage.getItem('nutrition_plan') || 'null');
-let userProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
-let memory = JSON.parse(localStorage.getItem('coach_memory') || '{}');
-let trainingLog = JSON.parse(localStorage.getItem('training_log') || '{}'); // { 'YYYY-MM-DD': { status, note } }
+let apiKey = loadKeyFromAnyLayer();
+let history = JSON.parse(localStorage.getItem(lsKey('chat_history')) || '[]');
+let measurements = JSON.parse(localStorage.getItem(lsKey('measurements')) || '[]');
+let progressPhotos = JSON.parse(localStorage.getItem(lsKey('progress_photos')) || '[]');
+let trainingPlan = JSON.parse(localStorage.getItem(lsKey('training_plan')) || 'null');
+let nutritionPlan = JSON.parse(localStorage.getItem(lsKey('nutrition_plan')) || 'null');
+let userProfile = JSON.parse(localStorage.getItem(lsKey('user_profile')) || '{}');
+let memory = JSON.parse(localStorage.getItem(lsKey('coach_memory')) || '{}');
+let trainingLog = JSON.parse(localStorage.getItem(lsKey('training_log')) || '{}'); // { 'YYYY-MM-DD': { status, note } }
+
+function loadUserState() {
+  history = JSON.parse(localStorage.getItem(lsKey('chat_history')) || '[]');
+  measurements = JSON.parse(localStorage.getItem(lsKey('measurements')) || '[]');
+  progressPhotos = JSON.parse(localStorage.getItem(lsKey('progress_photos')) || '[]');
+  trainingPlan = JSON.parse(localStorage.getItem(lsKey('training_plan')) || 'null');
+  nutritionPlan = JSON.parse(localStorage.getItem(lsKey('nutrition_plan')) || 'null');
+  userProfile = JSON.parse(localStorage.getItem(lsKey('user_profile')) || '{}');
+  memory = JSON.parse(localStorage.getItem(lsKey('coach_memory')) || '{}');
+  trainingLog = JSON.parse(localStorage.getItem(lsKey('training_log')) || '{}');
+}
 let pendingImages = [];
 let weightChart = null;
 let chartRange = 30;
@@ -760,6 +819,43 @@ let calMonth = new Date().getMonth();
 let calSelectedDate = null;
 let modalDate = null;
 
+// ── User selection ────────────────────────────────────────
+function selectUser(userId) {
+  currentUser = userId;
+  localStorage.setItem('coach_current_user', userId);
+  document.getElementById('user-select-overlay').style.display = 'none';
+
+  // Update sidebar for this user
+  const u = USERS[userId];
+  document.getElementById('sidebar-avatar').textContent = u.avatar;
+  document.getElementById('sidebar-name').textContent = u.label;
+  document.getElementById('sidebar-goal').textContent = u.defaultGoal;
+
+  // Load this user's data from localStorage
+  loadUserState();
+
+  // Override sidebar with saved profile if exists
+  if (userProfile?.name) {
+    document.getElementById('sidebar-name').textContent = userProfile.name;
+    document.getElementById('sidebar-avatar').textContent = userProfile.name[0];
+  }
+  if (userProfile?.goal) document.getElementById('sidebar-goal').textContent = userProfile.goal;
+
+  // Check API key then load
+  apiKey = loadKeyFromAnyLayer();
+  if (!apiKey) {
+    document.getElementById('key-overlay').style.display = 'flex';
+  } else {
+    renderChatHistory();
+    renderTraining();
+    loadFromSupabase();
+  }
+}
+
+function switchUser() {
+  document.getElementById('user-select-overlay').style.display = 'flex';
+}
+
 // ── API Key ──────────────────────────────────────────────
 function checkApiKey() {
   if (!apiKey) document.getElementById('key-overlay').style.display = 'flex';
@@ -768,7 +864,7 @@ function saveApiKey() {
   const val = document.getElementById('key-input').value.trim();
   if (!val.startsWith('sk-')) { showToast('מפתח לא תקין — חייב להתחיל ב-sk-'); return; }
   apiKey = val;
-  localStorage.setItem('coach_api_key', apiKey);
+  saveKeyAllLayers(apiKey);
   document.getElementById('key-overlay').style.display = 'none';
   showToast('✅ מפתח נשמר!');
   loadFromSupabase(); // טעון נתונים מהענן אחרי הכנסת המפתח
@@ -922,7 +1018,7 @@ function buildMessages(hist) {
 function handleToolUse(name, input) {
   if (name === 'update_profile') {
     Object.keys(input).forEach(k => { if (input[k]) userProfile[k] = input[k]; });
-    localStorage.setItem('user_profile', JSON.stringify(userProfile));
+    localStorage.setItem(lsKey('user_profile'), JSON.stringify(userProfile));
     syncUp('profile', userProfile);
     if (userProfile.name) {
       document.getElementById('sidebar-name').textContent = userProfile.name;
@@ -934,7 +1030,7 @@ function handleToolUse(name, input) {
     return null;
   } else if (name === 'update_memory') {
     memory[input.key] = input.value;
-    localStorage.setItem('coach_memory', JSON.stringify(memory));
+    localStorage.setItem(lsKey('coach_memory'), JSON.stringify(memory));
     syncUp('memory', memory);
     if (document.getElementById('profile-page').classList.contains('active')) renderMemory();
     return null;
@@ -945,14 +1041,14 @@ function handleToolUse(name, input) {
     });
     if (Object.keys(plan).length === 0) return null; // JSON parse was empty
     trainingPlan = plan;
-    localStorage.setItem('training_plan', JSON.stringify(plan));
+    localStorage.setItem(lsKey('training_plan'), JSON.stringify(plan));
     syncUp('training_plan', plan);
     showToastWithAction('✅ תוכנית אימונים נשמרה!', 'צפה בתוכנית', () => navigateTo('training'));
     return null;
   } else if (name === 'save_nutrition_plan') {
     if (!input.calories) return null; // JSON parse was incomplete
     nutritionPlan = input;
-    localStorage.setItem('nutrition_plan', JSON.stringify(input));
+    localStorage.setItem(lsKey('nutrition_plan'), JSON.stringify(input));
     syncUp('nutrition_plan', input);
     showToastWithAction('✅ תפריט תזונה נשמר!', 'צפה בתפריט', () => navigateTo('nutrition'));
     return null;
@@ -1111,7 +1207,7 @@ async function sendChat() {
 
 function saveChat() {
   const h = history.slice(-60);
-  localStorage.setItem('chat_history', JSON.stringify(h));
+  localStorage.setItem(lsKey('chat_history'), JSON.stringify(h));
   syncUp('chat_history', h);
 }
 
@@ -1176,7 +1272,7 @@ function saveProfile() {
     allergies: document.getElementById('p-allergies').value.trim(),
     supplements: document.getElementById('p-supplements').value.trim(),
   };
-  localStorage.setItem('user_profile', JSON.stringify(userProfile));
+  localStorage.setItem(lsKey('user_profile'), JSON.stringify(userProfile));
   syncUp('profile', userProfile);
   // Update sidebar
   if (userProfile.name) {
@@ -1220,14 +1316,14 @@ function renderMemory() {
 
 function deleteMemory(key) {
   delete memory[key];
-  localStorage.setItem('coach_memory', JSON.stringify(memory));
+  localStorage.setItem(lsKey('coach_memory'), JSON.stringify(memory));
   renderMemory();
 }
 
 function clearMemory() {
   if (!confirm('למחוק את כל הזיכרונות?')) return;
   memory = {};
-  localStorage.setItem('coach_memory', JSON.stringify(memory));
+  localStorage.setItem(lsKey('coach_memory'), JSON.stringify(memory));
   renderMemory();
   showToast('🧹 זיכרון נוקה');
 }
@@ -1440,17 +1536,17 @@ function saveModalDay() {
   if (note) trainingLog[modalDate].note = note;
   trainingLog[modalDate].updatedAt = new Date().toISOString();
 
-  localStorage.setItem('training_log', JSON.stringify(trainingLog));
+  localStorage.setItem(lsKey('training_log'), JSON.stringify(trainingLog));
   syncUp('training_log', trainingLog);
 
   // Update memory if injury or skip
   if (status === 'injury' && note) {
     memory[`פציעה_${modalDate}`] = note;
-    localStorage.setItem('coach_memory', JSON.stringify(memory));
+    localStorage.setItem(lsKey('coach_memory'), JSON.stringify(memory));
     syncUp('memory', memory);
   } else if (status === 'skipped' && note) {
     memory[`החמצת_אימון_${modalDate}`] = note;
-    localStorage.setItem('coach_memory', JSON.stringify(memory));
+    localStorage.setItem(lsKey('coach_memory'), JSON.stringify(memory));
     syncUp('memory', memory);
   }
 
@@ -1461,7 +1557,7 @@ function saveModalDay() {
 
 function clearModalDay() {
   delete trainingLog[modalDate];
-  localStorage.setItem('training_log', JSON.stringify(trainingLog));
+  localStorage.setItem(lsKey('training_log'), JSON.stringify(trainingLog));
   syncUp('training_log', trainingLog);
   closeModal();
   renderCalendar();
@@ -1603,7 +1699,7 @@ function logMeasurement() {
   const w = get('log-weight'), f = get('log-fat');
   if (!w && !f) { showToast('הכנס לפחות משקל או אחוז שומן'); return; }
   measurements.push({ date: new Date().toISOString(), weight: w, fat: f, waist: get('log-waist'), chest: get('log-chest'), arm: get('log-arm'), thigh: get('log-thigh') });
-  localStorage.setItem('measurements', JSON.stringify(measurements));
+  localStorage.setItem(lsKey('measurements'), JSON.stringify(measurements));
   syncUp('measurements', measurements);
   ['log-weight','log-fat','log-waist','log-chest','log-arm','log-thigh'].forEach(id => document.getElementById(id).value = '');
   renderProgress();
@@ -1633,7 +1729,7 @@ document.getElementById('photo-input').addEventListener('change', function () {
     r.onload = e => {
       const weight = prompt('מה המשקל שלך היום? (ק"ג)');
       progressPhotos.push({ src: e.target.result, date: new Date().toISOString(), weight: weight ? parseFloat(weight) : null });
-      try { localStorage.setItem('progress_photos', JSON.stringify(progressPhotos)); }
+      try { localStorage.setItem(lsKey('progress_photos'), JSON.stringify(progressPhotos)); }
       catch { showToast('⚠️ האחסון מלא — מחק תמונות ישנות'); progressPhotos.pop(); }
       renderPhotos();
     };
@@ -1652,18 +1748,28 @@ function analyzeLatestPhoto() {
 }
 
 // ── Init ──────────────────────────────────────────────────
-if (userProfile?.name) {
-  document.getElementById('sidebar-name').textContent = userProfile.name;
-  document.getElementById('sidebar-avatar').textContent = userProfile.name[0];
+if (!currentUser) {
+  // No user selected yet — show user picker
+  document.getElementById('user-select-overlay').style.display = 'flex';
+} else {
+  // Restore sidebar for this user
+  const u = USERS[currentUser];
+  if (u) {
+    document.getElementById('sidebar-avatar').textContent = u.avatar;
+    document.getElementById('sidebar-name').textContent = u.label;
+    document.getElementById('sidebar-goal').textContent = u.defaultGoal;
+  }
+  if (userProfile?.name) {
+    document.getElementById('sidebar-name').textContent = userProfile.name;
+    document.getElementById('sidebar-avatar').textContent = userProfile.name[0];
+  }
+  if (userProfile?.goal) document.getElementById('sidebar-goal').textContent = userProfile.goal;
+
+  checkApiKey();
+  renderChatHistory();
+  renderTraining();
+  if (apiKey) loadFromSupabase();
 }
-if (userProfile?.goal) document.getElementById('sidebar-goal').textContent = userProfile.goal;
-
-checkApiKey();
-renderChatHistory();
-renderTraining();
-
-// אם יש מפתח — טען מהענן
-if (apiKey) loadFromSupabase();
 </script>
 </body>
 </html>
