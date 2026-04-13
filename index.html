@@ -570,44 +570,68 @@ async function syncUp(dataType, data) {
   } catch {}
 }
 
+function applySupabaseRows(rows) {
+  rows.forEach(row => {
+    switch (row.data_type) {
+      case 'profile':
+        userProfile = row.data;
+        localStorage.setItem(lsKey('user_profile'), JSON.stringify(userProfile));
+        break;
+      case 'measurements':
+        measurements = row.data;
+        localStorage.setItem(lsKey('measurements'), JSON.stringify(measurements));
+        break;
+      case 'memory':
+        memory = row.data;
+        localStorage.setItem(lsKey('coach_memory'), JSON.stringify(memory));
+        break;
+      case 'training_plan':
+        trainingPlan = row.data;
+        localStorage.setItem(lsKey('training_plan'), JSON.stringify(trainingPlan));
+        break;
+      case 'nutrition_plan':
+        nutritionPlan = row.data;
+        localStorage.setItem(lsKey('nutrition_plan'), JSON.stringify(nutritionPlan));
+        break;
+      case 'training_log':
+        trainingLog = row.data;
+        localStorage.setItem(lsKey('training_log'), JSON.stringify(trainingLog));
+        break;
+      case 'chat_history':
+        history = row.data;
+        localStorage.setItem(lsKey('chat_history'), JSON.stringify(history));
+        break;
+    }
+  });
+}
+
 async function loadFromSupabase() {
   const userKey = getUserKey();
   if (!userKey) return;
   try {
-    const { data, error } = await supa.from('coach_data').select('*').eq('user_key', userKey);
-    if (error || !data) return;
-    data.forEach(row => {
-      switch (row.data_type) {
-        case 'profile':
-          userProfile = row.data;
-          localStorage.setItem(lsKey('user_profile'), JSON.stringify(userProfile));
-          break;
-        case 'measurements':
-          measurements = row.data;
-          localStorage.setItem(lsKey('measurements'), JSON.stringify(measurements));
-          break;
-        case 'memory':
-          memory = row.data;
-          localStorage.setItem(lsKey('coach_memory'), JSON.stringify(memory));
-          break;
-        case 'training_plan':
-          trainingPlan = row.data;
-          localStorage.setItem(lsKey('training_plan'), JSON.stringify(trainingPlan));
-          break;
-        case 'nutrition_plan':
-          nutritionPlan = row.data;
-          localStorage.setItem(lsKey('nutrition_plan'), JSON.stringify(nutritionPlan));
-          break;
-        case 'training_log':
-          trainingLog = row.data;
-          localStorage.setItem(lsKey('training_log'), JSON.stringify(trainingLog));
-          break;
-        case 'chat_history':
-          history = row.data;
-          localStorage.setItem(lsKey('chat_history'), JSON.stringify(history));
-          break;
+    let { data, error } = await supa.from('coach_data').select('*').eq('user_key', userKey);
+
+    // If no data found with new key, try old key format (before multi-user: just apiKey.slice(-24))
+    if ((!data || !data.length) && apiKey) {
+      const oldKey = apiKey.slice(-24);
+      const res2 = await supa.from('coach_data').select('*').eq('user_key', oldKey);
+      if (res2.data && res2.data.length) {
+        data = res2.data;
+        // Migrate old records to new key
+        for (const row of data) {
+          await supa.from('coach_data').upsert({
+            user_key: userKey,
+            data_type: row.data_type,
+            data: row.data,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_key,data_type' }).catch(() => {});
+        }
       }
-    });
+    }
+
+    if (error || !data || !data.length) return;
+    applySupabaseRows(data);
+
     // Refresh UI with synced data
     if (userProfile?.name) {
       document.getElementById('sidebar-name').textContent = userProfile.name;
@@ -616,6 +640,7 @@ async function loadFromSupabase() {
     if (userProfile?.goal) document.getElementById('sidebar-goal').textContent = userProfile.goal;
     renderChatHistory();
     renderTraining();
+    renderNutrition();
     showToast('☁️ נתונים סונכרנו!');
   } catch {}
 }
