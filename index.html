@@ -820,10 +820,24 @@ let calSelectedDate = null;
 let modalDate = null;
 
 // ── User selection ────────────────────────────────────────
+function migrateOldData(userId) {
+  // If this user has no namespaced data yet, migrate from the old unprefixed keys
+  const OLD_KEYS = ['chat_history','user_profile','measurements','progress_photos','training_plan','nutrition_plan','coach_memory','training_log'];
+  const hasData = OLD_KEYS.some(k => localStorage.getItem(`${userId}_${k}`) !== null);
+  if (hasData) return; // already migrated
+  OLD_KEYS.forEach(k => {
+    const val = localStorage.getItem(k);
+    if (val !== null) localStorage.setItem(`${userId}_${k}`, val);
+  });
+}
+
 function selectUser(userId) {
   currentUser = userId;
   localStorage.setItem('coach_current_user', userId);
   document.getElementById('user-select-overlay').style.display = 'none';
+
+  // Migrate old unprefixed data → namespaced (first time only)
+  migrateOldData(userId);
 
   // Update sidebar for this user
   const u = USERS[userId];
