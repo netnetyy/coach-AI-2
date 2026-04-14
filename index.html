@@ -775,43 +775,57 @@ function buildSystemPrompt() {
     });
   }
 
+  // ── נתוני האפליקציה (כבר טעונים, זמינים לך לחלוטין) ──
+  ctx += `\n\n════════════════════════════\n📱 נתוני האפליקציה של המשתמש\n════════════════════════════`;
+  ctx += `\nכל הנתונים הבאים נטענו ישירות מהאפליקציה. אתה רואה אותם, יכול להתייחס אליהם, לנתח אותם ולעדכן אותם דרך הכלים שלך.`;
+
   // Current training plan
   const plan = trainingPlan;
   if (plan && Object.keys(plan).length) {
-    ctx += `\n\n**תוכנית האימונים הנוכחית:**`;
-    Object.keys(plan).sort((a,b)=>a-b).forEach(idx => {
+    ctx += `\n\n📋 תוכנית האימונים הנוכחית:`;
+    Object.keys(plan).sort((a,b)=>Number(a)-Number(b)).forEach(idx => {
       const d = plan[idx];
       if (d.rest) {
-        ctx += `\n- יום ${DAY_NAMES[idx]}: מנוחה`;
+        ctx += `\n- יום ${DAY_NAMES[idx] || idx}: מנוחה`;
       } else {
-        ctx += `\n- יום ${DAY_NAMES[idx]}: ${d.type}`;
+        ctx += `\n- יום ${DAY_NAMES[idx] || idx}: ${d.type}`;
         if (d.exercises?.length) {
           d.exercises.forEach(e => { ctx += `\n  • ${e.name} — ${e.sets} סטים × ${e.reps} (מנוחה ${e.rest})`; });
         }
       }
     });
+  } else {
+    ctx += `\n\n📋 תוכנית אימונים: אין תוכנית שמורה עדיין.`;
   }
 
   // Current nutrition plan
   const nplan = nutritionPlan;
   if (nplan) {
-    ctx += `\n\n**תפריט התזונה הנוכחי:** ${nplan.calories} קל/יום | חלבון ${nplan.protein}ג | פחמימות ${nplan.carbs}ג | שומן ${nplan.fat}ג`;
+    ctx += `\n\n🥗 תפריט התזונה הנוכחי: ${nplan.calories} קל/יום | חלבון ${nplan.protein}ג | פחמימות ${nplan.carbs}ג | שומן ${nplan.fat}ג`;
     if (nplan.meals?.length) {
       nplan.meals.forEach(m => { ctx += `\n- ${m.name}: ${m.cals} קל`; });
     }
+  } else {
+    ctx += `\n\n🥗 תפריט תזונה: אין תפריט שמור עדיין.`;
   }
 
   // Measurements history (last 10)
   if (measurements.length) {
     const last = measurements[measurements.length - 1];
-    ctx += `\n\n**מדידה אחרונה (${new Date(last.date).toLocaleDateString('he-IL')}):**`;
+    ctx += `\n\n📊 מדידות:`;
+    ctx += `\n- אחרונה (${new Date(last.date).toLocaleDateString('he-IL')}):`;
     if (last.weight) ctx += ` משקל ${last.weight}ק"ג`;
     if (last.fat) ctx += ` | שומן ${last.fat}%`;
     if (last.waist) ctx += ` | מותן ${last.waist}ס"מ`;
     if (measurements.length > 1) {
       const first = measurements[Math.max(0, measurements.length-10)];
-      if (first.weight && last.weight) ctx += ` | שינוי: ${(last.weight - first.weight).toFixed(1)}ק"ג`;
+      if (first.weight && last.weight) {
+        const diff = (last.weight - first.weight).toFixed(1);
+        ctx += `\n- שינוי ב-${Math.min(measurements.length,10)} מדידות אחרונות: ${diff > 0 ? '+' : ''}${diff}ק"ג`;
+      }
     }
+  } else {
+    ctx += `\n\n📊 מדידות: אין מדידות שמורות עדיין.`;
   }
 
   // Memory context
