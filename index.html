@@ -803,7 +803,12 @@ function buildSystemPrompt() {
   if (nplan) {
     ctx += `\n\n🥗 תפריט התזונה הנוכחי: ${nplan.calories} קל/יום | חלבון ${nplan.protein}ג | פחמימות ${nplan.carbs}ג | שומן ${nplan.fat}ג`;
     if (nplan.meals?.length) {
-      nplan.meals.forEach(m => { ctx += `\n- ${m.name}: ${m.cals} קל`; });
+      nplan.meals.forEach(m => {
+        ctx += `\n- ${m.name} (${m.cals} קל):`;
+        if (m.items?.length) {
+          m.items.forEach(it => { ctx += `\n  • ${it.name} — ${it.macros}`; });
+        }
+      });
     }
   } else {
     ctx += `\n\n🥗 תפריט תזונה: אין תפריט שמור עדיין.`;
