@@ -291,8 +291,16 @@ canvas { width: 100% !important; }
     <!-- Chat -->
     <div id="chat-page" class="page active">
       <div class="page-header">
-        <div class="page-title">💬 המאמן שלך</div>
-        <div class="page-sub">שאל כל שאלה, קבל תוכנית, העלה תמונות לניתוח</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="page-title">💬 המאמן שלך</div>
+            <div class="page-sub">שאל כל שאלה, קבל תוכנית, העלה תמונות לניתוח</div>
+          </div>
+          <button class="btn btn-ghost" style="font-size:13px;padding:8px 16px;display:flex;align-items:center;gap:6px" onclick="newChat()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            שיחה חדשה
+          </button>
+        </div>
       </div>
       <div id="chat-messages"></div>
       <div id="chat-input-area">
@@ -1459,6 +1467,15 @@ async function sendChat() {
   }
 
   btn.disabled = false;
+}
+
+function newChat() {
+  if (!confirm('להתחיל שיחה חדשה? היסטוריית השיחה הנוכחית תימחק (הפרופיל, התוכנית והתפריט נשמרים).')) return;
+  history = [];
+  localStorage.setItem(lsKey('chat_history'), JSON.stringify([]));
+  syncUp('chat_history', []);
+  renderChatHistory();
+  showToast('🆕 שיחה חדשה התחילה!');
 }
 
 function saveChat() {
