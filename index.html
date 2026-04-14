@@ -279,6 +279,10 @@ canvas { width: 100% !important; }
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       </div>
+      <button onclick="changeApiKey()" title="החלף API Key" style="margin-top:8px;width:100%;background:none;border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text3);font-size:12px;font-family:'Heebo',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>החלף API Key</span>
+      </button>
     </div>
   </div>
 
@@ -984,6 +988,12 @@ function switchUser() {
   document.getElementById('user-select-overlay').style.display = 'flex';
 }
 
+function changeApiKey() {
+  document.getElementById('key-input').value = '';
+  document.getElementById('key-overlay').style.display = 'flex';
+  document.getElementById('key-input').focus();
+}
+
 // ── API Key ──────────────────────────────────────────────
 function checkApiKey() {
   if (!apiKey) document.getElementById('key-overlay').style.display = 'flex';
@@ -991,11 +1001,39 @@ function checkApiKey() {
 function saveApiKey() {
   const val = document.getElementById('key-input').value.trim();
   if (!val.startsWith('sk-')) { showToast('מפתח לא תקין — חייב להתחיל ב-sk-'); return; }
+  const oldKey = apiKey;
   apiKey = val;
   saveKeyAllLayers(apiKey);
   document.getElementById('key-overlay').style.display = 'none';
-  showToast('✅ מפתח נשמר!');
-  loadFromSupabase(); // טעון נתונים מהענן אחרי הכנסת המפתח
+  showToast('✅ מפתח נשמר! מסנכרן נתונים...');
+  // If changing key, migrate Supabase data from old key to new key
+  if (oldKey && oldKey !== apiKey) {
+    migrateSupabaseKey(oldKey).then(() => loadFromSupabase());
+  } else {
+    loadFromSupabase();
+  }
+}
+
+async function migrateSupabaseKey(oldApiKey) {
+  if (!currentUser || !oldApiKey) return;
+  const oldUserKey = `${currentUser}_${oldApiKey.slice(-24)}`;
+  const newUserKey = getUserKey();
+  try {
+    const { data } = await supa.from('coach_data').select('*').eq('user_key', oldUserKey);
+    if (!data || !data.length) {
+      // Try unprefixed old key too
+      const { data: data2 } = await supa.from('coach_data').select('*').eq('user_key', oldApiKey.slice(-24));
+      if (data2 && data2.length) {
+        for (const row of data2) {
+          await supa.from('coach_data').upsert({ user_key: newUserKey, data_type: row.data_type, data: row.data, updated_at: new Date().toISOString() }, { onConflict: 'user_key,data_type' }).catch(() => {});
+        }
+      }
+      return;
+    }
+    for (const row of data) {
+      await supa.from('coach_data').upsert({ user_key: newUserKey, data_type: row.data_type, data: row.data, updated_at: new Date().toISOString() }, { onConflict: 'user_key,data_type' }).catch(() => {});
+    }
+  } catch {}
 }
 document.getElementById('key-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveApiKey(); });
 
