@@ -687,6 +687,7 @@ async function loadFromSupabase() {
     renderTraining();
     renderNutrition();
     showToast('☁️ נתונים סונכרנו!');
+    showWelcomeIfNeeded();
   } catch {}
 }
 
@@ -856,29 +857,53 @@ function buildSystemPrompt() {
     ctx += `\n\n🥗 תפריט תזונה: אין תפריט שמור עדיין.`;
   }
 
-  // Measurements history (last 10)
+  // Measurements — rich trend analysis
   if (measurements.length) {
     const last = measurements[measurements.length - 1];
-    ctx += `\n\n📊 מדידות:`;
-    ctx += `\n- אחרונה (${new Date(last.date).toLocaleDateString('he-IL')}):`;
-    if (last.weight) ctx += ` משקל ${last.weight}ק"ג`;
-    if (last.fat) ctx += ` | שומן ${last.fat}%`;
-    if (last.waist) ctx += ` | מותן ${last.waist}ס"מ`;
+    ctx += `\n\n📊 היסטוריית מדידות (${measurements.length} רשומות):`;
+    ctx += `\n- אחרונה (${new Date(last.date).toLocaleDateString('he-IL')}): משקל ${last.weight || '—'}ק"ג${last.fat ? ` | שומן ${last.fat}%` : ''}${last.waist ? ` | מותן ${last.waist}ס"מ` : ''}`;
+
+    // 5 recent entries for visual trend
     if (measurements.length > 1) {
-      const first = measurements[Math.max(0, measurements.length-10)];
-      if (first.weight && last.weight) {
-        const diff = (last.weight - first.weight).toFixed(1);
-        ctx += `\n- שינוי ב-${Math.min(measurements.length,10)} מדידות אחרונות: ${diff > 0 ? '+' : ''}${diff}ק"ג`;
+      const recent = measurements.slice(-5).filter(m => m.weight);
+      if (recent.length > 1) {
+        ctx += `\n- מגמה אחרונה: ${recent.map(m => `${m.weight}ק"ג (${new Date(m.date).toLocaleDateString('he-IL', {day:'2-digit',month:'2-digit'})})`).join(' → ')}`;
       }
     }
+
+    // 7-day trend
+    const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    const wMeas = measurements.filter(m => m.weight && new Date(m.date) >= weekAgo);
+    if (wMeas.length >= 2) {
+      const d = (wMeas[wMeas.length-1].weight - wMeas[0].weight).toFixed(1);
+      ctx += `\n- מגמה שבועית: ${d > 0 ? '+' : ''}${d}ק"ג ב-7 ימים`;
+    }
+
+    // 30-day trend + rate
+    const monthAgo = new Date(); monthAgo.setDate(monthAgo.getDate() - 30);
+    const mMeas = measurements.filter(m => m.weight && new Date(m.date) >= monthAgo);
+    if (mMeas.length >= 2) {
+      const d = (mMeas[mMeas.length-1].weight - mMeas[0].weight).toFixed(1);
+      const rate = (d / 4.3).toFixed(2);
+      ctx += `\n- מגמה חודשית: ${d > 0 ? '+' : ''}${d}ק"ג ב-30 יום (${rate > 0 ? '+' : ''}${rate}ק"ג/שבוע בממוצע)`;
+    }
+
+    // All-time change
+    if (measurements.length >= 3 && measurements[0].weight && last.weight) {
+      const total = (last.weight - measurements[0].weight).toFixed(1);
+      ctx += `\n- שינוי כולל מהמדידה הראשונה: ${total > 0 ? '+' : ''}${total}ק"ג`;
+    }
+
+    ctx += `\n⚡ כשרלוונטי — התייחס למגמות האלה בשיחה (למשל: "שמתי לב שירדת X ק"ג בשבועיים — כל הכבוד!").`;
   } else {
     ctx += `\n\n📊 מדידות: אין מדידות שמורות עדיין.`;
   }
 
-  // Memory context
+  // Memory — active usage instruction
   const memKeys = Object.keys(memory);
   if (memKeys.length) {
-    ctx += `\n\n**זיכרון — עובדות שלמדת על המשתמש:**`;
+    ctx += `\n\n**זיכרון — עובדות שלמדת על המשתמש (השתמש בהן אקטיבית):**`;
+    ctx += `\n⚠️ בכל הצעת תרגיל — בדוק פציעות בזיכרון ובפרופיל ותן חלופות מתאימות. בכל הצעת אוכל — בדוק העדפות תזונה ואלרגיות ותתאים אוטומטית.`;
     memKeys.forEach(k => { ctx += `\n- ${k}: ${memory[k]}`; });
   }
 
@@ -1085,6 +1110,8 @@ function selectUser(userId) {
     renderChatHistory();
     renderTraining();
     loadFromSupabase();
+    // Fallback: show welcome from local data if Supabase is slow/offline
+    setTimeout(showWelcomeIfNeeded, 1200);
   }
 }
 
@@ -1501,6 +1528,62 @@ async function sendChat() {
   }
 
   btn.disabled = false;
+}
+
+// ── Welcome message (code-based, no API call) ─────────────
+function generateWelcomeMessage() {
+  const name = userProfile?.name || 'חבר';
+  const hour = new Date().getHours();
+  const greeting = hour < 5 ? 'לילה טוב' : hour < 12 ? 'בוקר טוב' : hour < 17 ? 'צהריים טובים' : hour < 21 ? 'ערב טוב' : 'לילה טוב';
+
+  // Today's training plan
+  const todayIdx = new Date().getDay(); // 0=Sun … 6=Sat
+  const todayPlan = trainingPlan?.[todayIdx];
+  let trainingLine = '';
+  if (todayPlan) {
+    if (todayPlan.rest) {
+      trainingLine = 'היום הוא יום מנוחה — תנצל לריקוורי, שינה ותזונה טובה. 🛌';
+    } else {
+      trainingLine = `היום יש לך אימון **${todayPlan.type || todayPlan.name || 'כוח'}** — מוכן? 💪`;
+    }
+  }
+
+  // Weight trend (last 2 measurements)
+  let weightLine = '';
+  if (measurements.length >= 2) {
+    const last = measurements[measurements.length - 1];
+    const prev = measurements[measurements.length - 2];
+    if (last.weight && prev.weight) {
+      const diff = +(last.weight - prev.weight).toFixed(1);
+      if (diff < -0.1) weightLine = `שמתי לב שירדת ${Math.abs(diff)} ק"ג מהמדידה הקודמת — כל הכבוד! 🔥`;
+      else if (diff > 0.1) weightLine = `שמתי לב שעלית ${diff} ק"ג מהמדידה הקודמת — בדוק שאתה על המסלול הנכון.`;
+    }
+  }
+
+  // Last training log — days since last workout
+  let logLine = '';
+  const logEntries = Object.entries(trainingLog).sort((a,b) => a[0].localeCompare(b[0]));
+  if (logEntries.length) {
+    const lastEntry = logEntries[logEntries.length - 1];
+    const daysSince = Math.floor((Date.now() - new Date(lastEntry[0]).getTime()) / 86400000);
+    if (daysSince === 0 && lastEntry[1].status === 'done') logLine = 'ראיתי שאימנת היום — כל הכבוד! 🏆';
+    else if (daysSince >= 3 && lastEntry[1].status !== 'planned_rest') logLine = `עברו ${daysSince} ימים מהאימון האחרון — הגיע הזמן לחזור לכושר! 🚀`;
+  }
+
+  let msg = `${greeting} ${name}! 👋\n\n`;
+  const lines = [trainingLine, weightLine, logLine].filter(Boolean);
+  if (lines.length) msg += lines.join('\n\n') + '\n\nבמה אוכל לעזור היום?';
+  else msg += 'מה עובד על הפרק היום?';
+  return msg;
+}
+
+function showWelcomeIfNeeded() {
+  if (!userProfile || !Object.keys(userProfile).length) return;
+  const todayStr = new Date().toDateString();
+  const key = lsKey('last_greet_date');
+  if (localStorage.getItem(key) === todayStr) return;
+  localStorage.setItem(key, todayStr);
+  appendBubble('agent', generateWelcomeMessage());
 }
 
 function newChat() {
