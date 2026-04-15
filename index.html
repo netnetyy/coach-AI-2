@@ -1592,7 +1592,10 @@ function newChat() {
   localStorage.setItem(lsKey('chat_history'), JSON.stringify([]));
   syncUp('chat_history', []);
   renderChatHistory();
-  showToast('🆕 שיחה חדשה התחילה!');
+  // Always show welcome on new chat, regardless of daily flag
+  if (userProfile && Object.keys(userProfile).length) {
+    appendBubble('agent', generateWelcomeMessage());
+  }
 }
 
 function saveChat() {
