@@ -1296,17 +1296,30 @@ function updateStreamBubble(bub, text, isThinking) {
 }
 
 function buildMessages(hist) {
-  return hist.map(m => {
+  // Find index of last user message that has images — only that one gets images sent to API
+  // (historical images are already "seen"; re-sending them bloats the request and causes timeouts)
+  let lastImgIdx = -1;
+  for (let i = hist.length - 1; i >= 0; i--) {
+    if (hist[i].images && hist[i].images.length) { lastImgIdx = i; break; }
+  }
+
+  return hist.map((m, idx) => {
     const role = m.role === 'assistant' ? 'assistant' : 'user';
-    if (m.images && m.images.length) {
+    if (m.images && m.images.length && idx === lastImgIdx) {
       const content = [];
-      m.images.forEach(src => {
-        const b64 = src.split(',')[1];
-        const mime = src.match(/data:([^;]+)/)[1];
-        content.push({ type: 'image', source: { type: 'base64', media_type: mime, data: b64 } });
-      });
       if (m.content) content.push({ type: 'text', text: m.content });
+      m.images.forEach(src => {
+        try {
+          const b64 = src.split(',')[1];
+          const mime = (src.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+          content.push({ type: 'image', source: { type: 'base64', media_type: mime, data: b64 } });
+        } catch {}
+      });
       return { role, content };
+    }
+    // Historical image messages — send only text, note the image was already analyzed
+    if (m.images && m.images.length && idx !== lastImgIdx) {
+      return { role, content: (m.content ? m.content + ' [תמונה כבר נותחה]' : '[תמונה כבר נותחה]') };
     }
     return { role, content: m.content };
   });
@@ -1611,10 +1624,32 @@ document.getElementById('chat-text').addEventListener('input', function () {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, 120) + 'px';
 });
+function compressImage(dataUrl, maxPx = 1024, quality = 0.82) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let { width: w, height: h } = img;
+      if (w > maxPx || h > maxPx) {
+        if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+        else       { w = Math.round(w * maxPx / h); h = maxPx; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
 document.getElementById('file-input').addEventListener('change', function () {
   Array.from(this.files).forEach(f => {
     const r = new FileReader();
-    r.onload = e => { pendingImages.push({ preview: e.target.result }); renderImgPreview(); };
+    r.onload = async e => {
+      const compressed = await compressImage(e.target.result);
+      pendingImages.push({ preview: compressed });
+      renderImgPreview();
+    };
     r.readAsDataURL(f);
   });
   this.value = '';
