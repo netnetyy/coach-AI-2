@@ -1538,9 +1538,9 @@ async function sendChat() {
 
   } catch (e) {
     updateStreamBubble(bub, '⚠️ שגיאה: ' + e.message, false);
+  } finally {
+    btn.disabled = false;
   }
-
-  btn.disabled = false;
 }
 
 // ── Welcome message (code-based, no API call) ─────────────
@@ -1612,9 +1612,11 @@ function newChat() {
 }
 
 function saveChat() {
-  const h = history.slice(-60);
-  localStorage.setItem(lsKey('chat_history'), JSON.stringify(h));
-  syncUp('chat_history', h);
+  try {
+    const h = history.slice(-60);
+    localStorage.setItem(lsKey('chat_history'), JSON.stringify(h));
+    syncUp('chat_history', h);
+  } catch {} // quota errors must not crash sendChat
 }
 
 document.getElementById('chat-text').addEventListener('keydown', e => {
@@ -2177,10 +2179,11 @@ document.getElementById('photo-input').addEventListener('change', function () {
   this.value = '';
 });
 
-function analyzeLatestPhoto() {
+async function analyzeLatestPhoto() {
   if (!progressPhotos.length) { showToast('אין תמונות — הוסף קודם'); return; }
   navigateTo('chat');
-  pendingImages = [{ preview: progressPhotos[progressPhotos.length - 1].src }];
+  const compressed = await compressImage(progressPhotos[progressPhotos.length - 1].src);
+  pendingImages = [{ preview: compressed }];
   renderImgPreview();
   document.getElementById('chat-text').value = 'נתח את הגוף שלי בתמונה — אחוז שומן משוער, אזורים עם שריר, ומה לשפר';
   sendChat();
