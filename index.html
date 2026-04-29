@@ -261,8 +261,8 @@ canvas { width: 100% !important; }
 <div id="key-overlay" class="key-overlay" style="display:none">
   <div class="key-dialog">
     <h2>🔑 הגדרת מפתח API</h2>
-    <p>כדי להפעיל את COACH AI תצטרך מפתח API של Anthropic.<br>המפתח נשמר <strong>רק בדפדפן שלך</strong> ולא נשלח לשום שרת חיצוני.</p>
-    <input type="password" id="key-input" placeholder="sk-ant-api03-..." autocomplete="off" dir="ltr" autocomplete="current-password">
+    <p>כדי להפעיל את COACH AI תצטרך מפתח API של Groq (חינמי).<br>הירשם בחינם על <strong>console.groq.com</strong> וצור מפתח API.<br>המפתח נשמר <strong>רק בדפדפן שלך</strong> ולא נשלח לשום שרת חיצוני.</p>
+    <input type="password" id="key-input" placeholder="gsk_..." autocomplete="off" dir="ltr" autocomplete="current-password">
     <button class="btn btn-accent" style="width:100%;padding:12px" onclick="saveApiKey()">שמור והתחל 💪</button>
     <div class="key-note">🔒 המפתח מאוחסן בצורה מאובטחת במכשיר שלך</div>
   </div>
@@ -692,7 +692,7 @@ async function loadFromSupabase() {
 }
 
 // ── Config ──────────────────────────────────────────────
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = 'llama-3.3-70b-versatile';
 
 const SYSTEM_BASE = `אתה "COACH AI" — מאמן כושר אישי ברמה עולמית. תואר בפיזיולוגיה של הספורט, הסמכות NSCA-CSCS ו-ISSN, ניסיון של 15 שנה עם מאות מתאמנים. אתה מדבר עברית בצורה ישירה, מקצועית ומדויקת — כמו מאמן אמיתי, לא כמו רובוט.
 
@@ -911,87 +911,101 @@ function buildSystemPrompt() {
 }
 
 const TOOLS = [
-  { type: 'web_search_20250305', name: 'web_search' },
   {
-    name: 'update_training_log',
-    description: 'עדכן את יומן האימונים ליום מסוים. קרא כשהמשתמש אומר שעשה/לא עשה אימון, פציעה, מנוחה — גם אם לא אמר תאריך מפורש (השתמש בתאריך היום).',
-    input_schema: {
-      type: 'object', required: ['date', 'status'],
-      properties: {
-        date: { type: 'string', description: 'תאריך בפורמט YYYY-MM-DD. אם המשתמש אמר "היום" השתמש בתאריך היום.' },
-        status: { type: 'string', enum: ['done', 'changed', 'skipped', 'injury', 'planned_rest'], description: 'done=עשיתי כמתוכנן, changed=עשיתי אחר, skipped=לא אימנתי, injury=פציעה, planned_rest=מנוחה מתוכננת' },
-        note: { type: 'string', description: 'הסבר קצר — מה עשה, מה קרה, איך הרגיש' }
+    type: 'function',
+    function: {
+      name: 'update_training_log',
+      description: 'עדכן את יומן האימונים ליום מסוים. קרא כשהמשתמש אומר שעשה/לא עשה אימון, פציעה, מנוחה — גם אם לא אמר תאריך מפורש (השתמש בתאריך היום).',
+      parameters: {
+        type: 'object', required: ['date', 'status'],
+        properties: {
+          date: { type: 'string', description: 'תאריך בפורמט YYYY-MM-DD. אם המשתמש אמר "היום" השתמש בתאריך היום.' },
+          status: { type: 'string', enum: ['done', 'changed', 'skipped', 'injury', 'planned_rest'], description: 'done=עשיתי כמתוכנן, changed=עשיתי אחר, skipped=לא אימנתי, injury=פציעה, planned_rest=מנוחה מתוכננת' },
+          note: { type: 'string', description: 'הסבר קצר — מה עשה, מה קרה, איך הרגיש' }
+        }
       }
     }
   },
   {
-    name: 'log_measurement',
-    description: 'רשום מדידה חדשה לגרף ההתקדמות כשהמשתמש מזכיר את המשקל שלו בשיחה. קרא מיד כשהמשתמש אומר "אני שוקל X", "המשקל שלי X", "עליתי/ירדתי ל-X" וכד\'.',
-    input_schema: {
-      type: 'object', required: ['weight'],
-      properties: {
-        weight: { type: 'number', description: 'משקל בקילוגרם' },
-        fat:    { type: 'number', description: 'אחוז שומן אם צוין' },
-        waist:  { type: 'number', description: 'היקף מותן בסנטימטר אם צוין' }
+    type: 'function',
+    function: {
+      name: 'log_measurement',
+      description: 'רשום מדידה חדשה לגרף ההתקדמות כשהמשתמש מזכיר את המשקל שלו בשיחה. קרא מיד כשהמשתמש אומר "אני שוקל X", "המשקל שלי X", "עליתי/ירדתי ל-X" וכד\'.',
+      parameters: {
+        type: 'object', required: ['weight'],
+        properties: {
+          weight: { type: 'number', description: 'משקל בקילוגרם' },
+          fat:    { type: 'number', description: 'אחוז שומן אם צוין' },
+          waist:  { type: 'number', description: 'היקף מותן בסנטימטר אם צוין' }
+        }
       }
     }
   },
   {
-    name: 'update_profile',
-    description: 'עדכן את פרופיל המשתמש כשאתה לומד פרטים אישיים בשיחה. קרא מיד כשהמשתמש מספר על עצמו — גיל, גובה, משקל, ניסיון, מטרה, ציוד, פציעות, תזונה.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        name:        { type: 'string', description: 'שם פרטי' },
-        age:         { type: 'string', description: 'גיל' },
-        height:      { type: 'string', description: 'גובה בסנטימטר' },
-        weight:      { type: 'string', description: 'משקל בקילוגרם' },
-        goal:        { type: 'string', enum: ['חיטוב','בניית שריר','ירידה במשקל','כוח מקסימלי','שיפור כושר כללי'] },
-        level:       { type: 'string', enum: ['מתחיל (פחות משנה)','בינוני (1-3 שנים)','מתקדם (3+ שנים)'] },
-        days:        { type: 'string', description: 'ימי אימון בשבוע' },
-        equipment:   { type: 'string', enum: ['חדר כושר מלא','משקולות בית + מוט','ממ"ד / משקולות קטנות בלבד','ללא ציוד (משקל גוף)'] },
-        injuries:    { type: 'string', description: 'פציעות או מגבלות גופניות' },
-        diet:        { type: 'string', enum: ['אוכל הכל','ללא בשר חזיר','צמחוני','טבעוני','כשר'] },
-        allergies:   { type: 'string', description: 'אלרגיות או מזונות שלא אוהב' },
-        supplements: { type: 'string', description: 'תוספי תזונה שנוטל' }
+    type: 'function',
+    function: {
+      name: 'update_profile',
+      description: 'עדכן את פרופיל המשתמש כשאתה לומד פרטים אישיים בשיחה. קרא מיד כשהמשתמש מספר על עצמו — גיל, גובה, משקל, ניסיון, מטרה, ציוד, פציעות, תזונה.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name:        { type: 'string', description: 'שם פרטי' },
+          age:         { type: 'string', description: 'גיל' },
+          height:      { type: 'string', description: 'גובה בסנטימטר' },
+          weight:      { type: 'string', description: 'משקל בקילוגרם' },
+          goal:        { type: 'string', enum: ['חיטוב','בניית שריר','ירידה במשקל','כוח מקסימלי','שיפור כושר כללי'] },
+          level:       { type: 'string', enum: ['מתחיל (פחות משנה)','בינוני (1-3 שנים)','מתקדם (3+ שנים)'] },
+          days:        { type: 'string', description: 'ימי אימון בשבוע' },
+          equipment:   { type: 'string', enum: ['חדר כושר מלא','משקולות בית + מוט','ממ"ד / משקולות קטנות בלבד','ללא ציוד (משקל גוף)'] },
+          injuries:    { type: 'string', description: 'פציעות או מגבלות גופניות' },
+          diet:        { type: 'string', enum: ['אוכל הכל','ללא בשר חזיר','צמחוני','טבעוני','כשר'] },
+          allergies:   { type: 'string', description: 'אלרגיות או מזונות שלא אוהב' },
+          supplements: { type: 'string', description: 'תוספי תזונה שנוטל' }
+        }
       }
     }
   },
   {
-    name: 'update_memory',
-    description: 'שמור עובדה חשובה שלמדת על המשתמש לזיכרון קבוע. השתמש בכל פעם שהמשתמש מספר משהו משמעותי שלא נכנס לפרופיל — העדפות, הרגלים, מטרות ספציפיות, התקדמות.',
-    input_schema: {
-      type: 'object', required: ['key', 'value'],
-      properties: {
-        key: { type: 'string', description: 'קטגוריה קצרה, למשל: לא_אוהב_ריצה, עובד_בלילות, רוצה_להתחרות' },
-        value: { type: 'string', description: 'הפרט עצמו בקצרה' }
+    type: 'function',
+    function: {
+      name: 'update_memory',
+      description: 'שמור עובדה חשובה שלמדת על המשתמש לזיכרון קבוע. השתמש בכל פעם שהמשתמש מספר משהו משמעותי שלא נכנס לפרופיל — העדפות, הרגלים, מטרות ספציפיות, התקדמות.',
+      parameters: {
+        type: 'object', required: ['key', 'value'],
+        properties: {
+          key: { type: 'string', description: 'קטגוריה קצרה, למשל: לא_אוהב_ריצה, עובד_בלילות, רוצה_להתחרות' },
+          value: { type: 'string', description: 'הפרט עצמו בקצרה' }
+        }
       }
     }
   },
   {
-    name: 'save_training_plan',
-    description: 'שמור תוכנית אימוני כוח שבועית לאפליקציה.',
-    input_schema: {
-      type: 'object', required: ['days'],
-      properties: {
-        days: {
-          type: 'array',
-          items: {
-            type: 'object', required: ['index', 'name', 'type', 'rest'],
-            properties: {
-              index: { type: 'number', description: '0=ראשון 1=שני 2=שלישי 3=רביעי 4=חמישי 5=שישי 6=שבת' },
-              name: { type: 'string' },
-              type: { type: 'string' },
-              rest: { type: 'boolean' },
-              exercises: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    sets: { type: 'number' },
-                    reps: { type: 'string' },
-                    rest: { type: 'string' }
+    type: 'function',
+    function: {
+      name: 'save_training_plan',
+      description: 'שמור תוכנית אימוני כוח שבועית לאפליקציה.',
+      parameters: {
+        type: 'object', required: ['days'],
+        properties: {
+          days: {
+            type: 'array',
+            items: {
+              type: 'object', required: ['index', 'name', 'type', 'rest'],
+              properties: {
+                index: { type: 'number', description: '0=ראשון 1=שני 2=שלישי 3=רביעי 4=חמישי 5=שישי 6=שבת' },
+                name: { type: 'string' },
+                type: { type: 'string' },
+                rest: { type: 'boolean' },
+                exercises: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' },
+                      sets: { type: 'number' },
+                      reps: { type: 'string' },
+                      rest: { type: 'string' }
+                    }
                   }
                 }
               }
@@ -1002,29 +1016,32 @@ const TOOLS = [
     }
   },
   {
-    name: 'save_nutrition_plan',
-    description: 'שמור תפריט תזונה יומי לאפליקציה.',
-    input_schema: {
-      type: 'object', required: ['calories', 'protein', 'carbs', 'fat', 'meals'],
-      properties: {
-        calories: { type: 'number' },
-        protein: { type: 'number' },
-        carbs: { type: 'number' },
-        fat: { type: 'number' },
-        meals: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              cals: { type: 'number' },
-              items: {
-                type: 'array',
+    type: 'function',
+    function: {
+      name: 'save_nutrition_plan',
+      description: 'שמור תפריט תזונה יומי לאפליקציה.',
+      parameters: {
+        type: 'object', required: ['calories', 'protein', 'carbs', 'fat', 'meals'],
+        properties: {
+          calories: { type: 'number' },
+          protein: { type: 'number' },
+          carbs: { type: 'number' },
+          fat: { type: 'number' },
+          meals: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                cals: { type: 'number' },
                 items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    macros: { type: 'string' }
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' },
+                      macros: { type: 'string' }
+                    }
                   }
                 }
               }
@@ -1131,7 +1148,7 @@ function checkApiKey() {
 }
 function saveApiKey() {
   const val = document.getElementById('key-input').value.trim();
-  if (!val.startsWith('sk-')) { showToast('מפתח לא תקין — חייב להתחיל ב-sk-'); return; }
+  if (!val.startsWith('gsk_')) { showToast('מפתח לא תקין — חייב להתחיל ב-gsk_'); return; }
   const oldKey = apiKey;
   apiKey = val;
   saveKeyAllLayers(apiKey);
@@ -1310,9 +1327,7 @@ function buildMessages(hist) {
       if (m.content) content.push({ type: 'text', text: m.content });
       m.images.forEach(src => {
         try {
-          const b64 = src.split(',')[1];
-          const mime = (src.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
-          content.push({ type: 'image', source: { type: 'base64', media_type: mime, data: b64 } });
+          content.push({ type: 'image_url', image_url: { url: src } });
         } catch {}
       });
       return { role, content };
@@ -1427,21 +1442,22 @@ async function sendChat() {
   const bub = createStreamBubble();
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 4096,
-        system: buildSystemPrompt(),
-        messages: buildMessages(history),
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          ...buildMessages(history)
+        ],
         stream: true,
-        tools: TOOLS
+        tools: TOOLS,
+        tool_choice: 'auto'
       })
     });
 
@@ -1453,10 +1469,9 @@ async function sendChat() {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '', fullText = '';
-    // Track tools by block index to handle interleaved thinking correctly
-    const toolBlocks = {}; // index -> { name, json }
+    // tool_calls accumulator: index -> { id, name, args }
+    const toolCallMap = {};
     const toolUses = [];
-    let isThinking = false;
 
     outer: while (true) {
       const { done, value } = await reader.read();
@@ -1468,52 +1483,43 @@ async function sendChat() {
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const payload = line.slice(6).trim();
-        if (!payload || payload === '[DONE]') continue;
+        if (!payload || payload === '[DONE]') { break outer; }
         let ev;
         try { ev = JSON.parse(payload); } catch { continue; }
 
-        const idx = ev.index ?? 0;
+        const delta = ev.choices?.[0]?.delta;
+        if (!delta) continue;
 
-        if (ev.type === 'content_block_start') {
-          const cb = ev.content_block;
-          if (cb?.type === 'thinking') {
-            isThinking = true;
-            updateStreamBubble(bub, fullText, true);
-          } else if (cb?.type === 'text') {
-            isThinking = false;
-          } else if (cb?.type === 'tool_use') {
-            isThinking = false;
-            toolBlocks[idx] = { name: cb.name, json: '' };
-            if (cb.name === 'web_search') updateStreamBubble(bub, fullText + '\n\n🔍 *מחפש באינטרנט...*', false);
-          } else if (cb?.type === 'server_tool_use' && cb?.name === 'web_search') {
-            updateStreamBubble(bub, fullText + '\n\n🔍 *מחפש באינטרנט...*', false);
+        if (delta.content) {
+          fullText += delta.content;
+          updateStreamBubble(bub, fullText, false);
+        }
+
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const i = tc.index ?? 0;
+            if (!toolCallMap[i]) toolCallMap[i] = { id: '', name: '', args: '' };
+            if (tc.id) toolCallMap[i].id = tc.id;
+            if (tc.function?.name) toolCallMap[i].name = tc.function.name;
+            if (tc.function?.arguments) toolCallMap[i].args += tc.function.arguments;
           }
-        } else if (ev.type === 'content_block_delta') {
-          if (ev.delta?.type === 'text_delta') {
-            isThinking = false;
-            fullText += ev.delta.text;
-            updateStreamBubble(bub, fullText, false);
-          } else if (ev.delta?.type === 'thinking_delta') {
-            // ignore thinking text
-          } else if (ev.delta?.type === 'input_json_delta' && toolBlocks[idx]) {
-            toolBlocks[idx].json += ev.delta.partial_json || '';
-          }
-        } else if (ev.type === 'content_block_stop') {
-          if (toolBlocks[idx]) {
-            const tb = toolBlocks[idx];
+        }
+
+        if (ev.choices?.[0]?.finish_reason === 'tool_calls' || ev.choices?.[0]?.finish_reason === 'stop') {
+          // Finalize collected tool calls
+          for (const tc of Object.values(toolCallMap)) {
             try {
-              const parsed = JSON.parse(tb.json);
-              toolUses.push({ name: tb.name, input: parsed });
-            } catch (e) {
-              // JSON incomplete — try to salvage by wrapping
-              console.warn('Tool JSON parse failed for', tb.name, tb.json);
-            }
-            delete toolBlocks[idx];
+              toolUses.push({ name: tc.name, input: JSON.parse(tc.args) });
+            } catch { console.warn('Tool JSON parse failed for', tc.name, tc.args); }
           }
-          if (isThinking) isThinking = false;
-        } else if (ev.type === 'message_stop') {
           break outer;
         }
+      }
+    }
+    // Collect any remaining tool calls not yet finalized
+    if (Object.keys(toolCallMap).length && !toolUses.length) {
+      for (const tc of Object.values(toolCallMap)) {
+        try { toolUses.push({ name: tc.name, input: JSON.parse(tc.args) }); } catch {}
       }
     }
 
