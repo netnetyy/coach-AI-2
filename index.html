@@ -1453,7 +1453,7 @@ async function sendChat() {
         max_tokens: 4096,
         messages: [
           { role: 'system', content: buildSystemPrompt() },
-          ...buildMessages(history)
+          ...buildMessages(history.slice(-10))
         ],
         stream: true,
         tools: TOOLS,
